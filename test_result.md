@@ -266,15 +266,18 @@ backend:
   
   - task: "Role-Based Access Control"
     implemented: true
-    working: "NA"
+    working: true
     file: "/app/app/api/[[...path]]/route.js"
     stuck_count: 0
     priority: "high"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
       - working: "NA"
         agent: "main"
         comment: "Implemented RBAC middleware with role checks for admin, inventory_manager, warehouse_staff, store_manager."
+      - working: true
+        agent: "testing"
+        comment: "✅ TESTED: Role-based access control working perfectly. Admin-only endpoints (users/list) correctly deny access to manager/staff with 'Insufficient permissions' error. All roles have appropriate access to inventory endpoints. RBAC middleware functioning correctly."
 
 frontend:
   - task: "Login/Registration UI"
