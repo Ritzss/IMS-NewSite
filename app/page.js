@@ -90,6 +90,13 @@ export default function VastraDrobeIMS() {
   const [inventory, setInventory] = useState([]);
   const [inventoryFilter, setInventoryFilter] = useState('all');
   const [selectedWarehouse, setSelectedWarehouse] = useState('');
+  const [showEditInventoryDialog, setShowEditInventoryDialog] = useState(false);
+  const [editInventoryForm, setEditInventoryForm] = useState({
+    inventoryId: '',
+    quantity: 0,
+    reorderLevel: 0,
+    reorderQuantity: 0
+  });
   
   // Stock Movements state
   const [stockMovements, setStockMovements] = useState([]);
