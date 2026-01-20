@@ -335,6 +335,42 @@ export async function POST(request, { params }) {
       });
     }
     
+    if (path === 'inventory/update') {
+      checkRole(user, ['admin', 'inventory_manager']);
+      
+      const { inventoryId, quantity, reorderLevel, reorderQuantity } = body;
+      
+      const inventory = await IMSInventory.findByIdAndUpdate(
+        inventoryId,
+        {
+          $set: {
+            quantity: parseInt(quantity),
+            reorderLevel: parseInt(reorderLevel),
+            reorderQuantity: parseInt(reorderQuantity),
+            lastUpdated: new Date(),
+            updatedBy: user.id
+          }
+        },
+        { new: true }
+      ).populate('warehouseId');
+      
+      if (!inventory) {
+        return Response.json({ error: 'Inventory record not found' }, { status: 404 });
+      }
+      
+      // Update product total stock
+      const allInventory = await IMSInventory.find({ productId: inventory.productId });
+      const totalStock = allInventory.reduce((sum, inv) => sum + inv.quantity, 0);
+      await Product.updateOne({ productId: inventory.productId }, { $set: { stock: totalStock } });
+      
+      await logActivity(user.id, 'update', 'inventory', inventoryId, null, { quantity, reorderLevel, reorderQuantity }, request.headers.get('x-forwarded-for'));
+      
+      return Response.json({ 
+        message: 'Inventory updated successfully', 
+        inventory 
+      });
+    }
+    
     // ----- ADMIN USERS -----
     
     if (path === 'admin-users/create') {
