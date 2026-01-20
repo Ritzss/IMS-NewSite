@@ -802,7 +802,7 @@ export default function VastraDrobeIMS() {
                     </DialogTrigger>
                     <DialogContent>
                       <DialogHeader>
-                        <DialogTitle>Add New Product</DialogTitle>
+                        <DialogTitle>{isEditingProduct ? 'Edit Product' : 'Add New Product'}</DialogTitle>
                       </DialogHeader>
                       <form onSubmit={createProduct} className="space-y-4">
                         <div>
@@ -836,7 +836,7 @@ export default function VastraDrobeIMS() {
                           <Label>Base Price (₹)</Label>
                           <Input type="number" value={productForm.basePrice} onChange={(e) => setProductForm({...productForm, basePrice: parseFloat(e.target.value)})} required />
                         </div>
-                        <Button type="submit" className="w-full">Create Product</Button>
+                        <Button type="submit" className="w-full">{isEditingProduct ? 'Update Product' : 'Create Product'}</Button>
                       </form>
                     </DialogContent>
                   </Dialog>
