@@ -192,6 +192,22 @@ export async function POST(request, { params }) {
       return Response.json({ message: 'Variant created', id: variantId });
     }
     
+    if (path === 'variants/update') {
+      checkRole(user, ['admin', 'inventory_manager']);
+      
+      const { id, sku, barcode, size, color, additionalPrice } = body;
+      const oldVariant = await db.collection('product_variants').findOne({ id });
+      
+      await db.collection('product_variants').updateOne(
+        { id },
+        { $set: { sku, barcode, size, color, additionalPrice } }
+      );
+      
+      await logActivity(db, user.id, 'update', 'variant', id, oldVariant, { sku, barcode, size, color, additionalPrice }, request.headers.get('x-forwarded-for'));
+      
+      return Response.json({ message: 'Variant updated' });
+    }
+    
     // Warehouses
     if (path === 'warehouses/create') {
       checkRole(user, ['admin']);
