@@ -1171,7 +1171,7 @@ export default function VastraDrobeIMS() {
                   </DialogTrigger>
                   <DialogContent>
                     <DialogHeader>
-                      <DialogTitle>Add Warehouse/Store</DialogTitle>
+                      <DialogTitle>{isEditingWarehouse ? 'Edit Warehouse/Store' : 'Add Warehouse/Store'}</DialogTitle>
                     </DialogHeader>
                     <form onSubmit={createWarehouse} className="space-y-4">
                       <div>
@@ -1206,7 +1206,7 @@ export default function VastraDrobeIMS() {
                         <Label>Address</Label>
                         <Input value={warehouseForm.address} onChange={(e) => setWarehouseForm({...warehouseForm, address: e.target.value})} />
                       </div>
-                      <Button type="submit" className="w-full">Create Location</Button>
+                      <Button type="submit" className="w-full">{isEditingWarehouse ? 'Update Location' : 'Create Location'}</Button>
                     </form>
                   </DialogContent>
                 </Dialog>
