@@ -503,6 +503,36 @@ export default function VastraDrobeIMS() {
     }
   };
   
+  const addInventory = async (e) => {
+    e.preventDefault();
+    try {
+      await apiCall('/inventory/add-stock', 'POST', {
+        productId: parseInt(addInventoryForm.productId),
+        warehouseId: addInventoryForm.warehouseId,
+        size: addInventoryForm.size,
+        quantity: parseInt(addInventoryForm.quantity),
+        reorderLevel: parseInt(addInventoryForm.reorderLevel),
+        reorderQuantity: parseInt(addInventoryForm.reorderQuantity),
+        reason: 'Direct inventory addition',
+        referenceNumber: `INV-${Date.now()}`
+      });
+      toast.success('Inventory added successfully');
+      setShowAddInventoryDialog(false);
+      setAddInventoryForm({
+        productId: '',
+        warehouseId: '',
+        size: '',
+        quantity: 0,
+        reorderLevel: 10,
+        reorderQuantity: 50
+      });
+      loadInventory();
+      loadDashboardStats();
+    } catch (error) {
+      toast.error(error.message);
+    }
+  };
+  
   // Check for existing token on mount
   useEffect(() => {
     const savedToken = localStorage.getItem('token');
