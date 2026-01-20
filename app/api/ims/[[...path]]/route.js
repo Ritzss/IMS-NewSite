@@ -127,24 +127,31 @@ export async function POST(request, { params }) {
     if (path === 'products/create') {
       checkRole(user, ['admin']);
       
-      const { name, price, mrp, category, subCategory, sizes, images, description, sku, brand } = body;
+      const { name, price, basePrice, mrp, category, subCategory, sizes, images, description, sku, brand } = body;
       
       // Get next productId
       const lastProduct = await Product.findOne().sort({ productId: -1 });
       const nextProductId = (lastProduct?.productId || 0) + 1;
       
+      // Use basePrice if provided, otherwise use price
+      const productPrice = basePrice || price;
+      
+      if (!productPrice) {
+        return Response.json({ error: 'Price is required' }, { status: 400 });
+      }
+      
       const product = await Product.create({
         productId: nextProductId,
         name,
-        price,
-        mrp,
+        price: productPrice,
+        mrp: mrp || productPrice,
         category,
-        subCategory,
+        subCategory: subCategory || '',
         sizes: sizes || [],
         images: images || [],
-        description,
-        sku,
-        brand,
+        description: description || '',
+        sku: sku || `SKU-${nextProductId}`,
+        brand: brand || 'VastraDrobe',
         stock: 0
       });
       
