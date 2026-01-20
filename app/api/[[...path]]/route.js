@@ -268,6 +268,22 @@ export async function POST(request, { params }) {
       return Response.json({ message: 'Category created', id: categoryId });
     }
     
+    if (path === 'categories/update') {
+      checkRole(user, ['admin', 'inventory_manager']);
+      
+      const { id, name, type, parentCategory } = body;
+      const oldCategory = await db.collection('categories').findOne({ id });
+      
+      await db.collection('categories').updateOne(
+        { id },
+        { $set: { name, type, parentCategory: parentCategory || null } }
+      );
+      
+      await logActivity(db, user.id, 'update', 'category', id, oldCategory, { name, type, parentCategory }, request.headers.get('x-forwarded-for'));
+      
+      return Response.json({ message: 'Category updated' });
+    }
+    
     // Inventory
     if (path === 'inventory/create') {
       checkRole(user, ['admin', 'inventory_manager', 'warehouse_staff']);
