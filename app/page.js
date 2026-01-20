@@ -858,6 +858,7 @@ export default function VastraDrobeIMS() {
                       <TableHead>Category</TableHead>
                       <TableHead>Base Price</TableHead>
                       <TableHead>Created</TableHead>
+                      {currentUser?.role === 'admin' && <TableHead>Actions</TableHead>}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -868,6 +869,13 @@ export default function VastraDrobeIMS() {
                         <TableCell>{product.category}</TableCell>
                         <TableCell>₹{product.basePrice}</TableCell>
                         <TableCell>{new Date(product.createdAt).toLocaleDateString()}</TableCell>
+                        {currentUser?.role === 'admin' && (
+                          <TableCell>
+                            <Button size="sm" variant="ghost" onClick={() => editProduct(product)}>
+                              <Pencil className="w-4 h-4" />
+                            </Button>
+                          </TableCell>
+                        )}
                       </TableRow>
                     ))}
                   </TableBody>
