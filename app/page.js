@@ -1007,10 +1007,94 @@ export default function VastraDrobeIMS() {
                 </Select>
               </div>
               
-              <Button onClick={loadInventory} variant="outline">
-                <Search className="w-4 h-4 mr-2" />
-                Refresh
-              </Button>
+              <div className="flex gap-2">
+                <Dialog open={showAddInventoryDialog} onOpenChange={setShowAddInventoryDialog}>
+                  <DialogTrigger asChild>
+                    <Button>
+                      <Plus className="w-4 h-4 mr-2" />
+                      Add Inventory
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Add New Inventory</DialogTitle>
+                      <DialogDescription>Add stock for a product in a warehouse</DialogDescription>
+                    </DialogHeader>
+                    <form onSubmit={addInventory} className="space-y-4">
+                      <div>
+                        <Label>Product ID</Label>
+                        <Input 
+                          type="number" 
+                          placeholder="Enter product ID" 
+                          value={addInventoryForm.productId} 
+                          onChange={(e) => setAddInventoryForm({...addInventoryForm, productId: e.target.value})} 
+                          required 
+                        />
+                      </div>
+                      <div>
+                        <Label>Warehouse</Label>
+                        <Select value={addInventoryForm.warehouseId} onValueChange={(val) => setAddInventoryForm({...addInventoryForm, warehouseId: val})}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select warehouse" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {warehouses.map(w => (
+                              <SelectItem key={w._id} value={w._id}>{w.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <Label>Size</Label>
+                        <Input 
+                          placeholder="e.g., S, M, L, 5-6Y" 
+                          value={addInventoryForm.size} 
+                          onChange={(e) => setAddInventoryForm({...addInventoryForm, size: e.target.value})} 
+                          required 
+                        />
+                      </div>
+                      <div>
+                        <Label>Initial Quantity</Label>
+                        <Input 
+                          type="number" 
+                          value={addInventoryForm.quantity} 
+                          onChange={(e) => setAddInventoryForm({...addInventoryForm, quantity: parseInt(e.target.value)})} 
+                          required 
+                          min="0"
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <Label>Reorder Level</Label>
+                          <Input 
+                            type="number" 
+                            value={addInventoryForm.reorderLevel} 
+                            onChange={(e) => setAddInventoryForm({...addInventoryForm, reorderLevel: parseInt(e.target.value)})} 
+                            required 
+                            min="0"
+                          />
+                        </div>
+                        <div>
+                          <Label>Reorder Quantity</Label>
+                          <Input 
+                            type="number" 
+                            value={addInventoryForm.reorderQuantity} 
+                            onChange={(e) => setAddInventoryForm({...addInventoryForm, reorderQuantity: parseInt(e.target.value)})} 
+                            required 
+                            min="0"
+                          />
+                        </div>
+                      </div>
+                      <Button type="submit" className="w-full">Add Inventory</Button>
+                    </form>
+                  </DialogContent>
+                </Dialog>
+                
+                <Button onClick={loadInventory} variant="outline">
+                  <Search className="w-4 h-4 mr-2" />
+                  Refresh
+                </Button>
+              </div>
             </div>
             
             <Card>
