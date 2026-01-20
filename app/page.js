@@ -283,39 +283,100 @@ export default function VastraDrobeIMS() {
   const createProduct = async (e) => {
     e.preventDefault();
     try {
-      await apiCall('/products/create', 'POST', productForm);
-      toast.success('Product created successfully');
+      if (isEditingProduct) {
+        await apiCall('/products/update', 'POST', productForm);
+        toast.success('Product updated successfully');
+      } else {
+        await apiCall('/products/create', 'POST', productForm);
+        toast.success('Product created successfully');
+      }
       setShowProductDialog(false);
-      setProductForm({ name: '', description: '', category: '', brand: '', basePrice: 0, images: [] });
+      setProductForm({ id: '', name: '', description: '', category: '', brand: '', basePrice: 0, images: [] });
+      setIsEditingProduct(false);
       loadProducts();
     } catch (error) {
       toast.error(error.message);
     }
   };
   
+  const editProduct = (product) => {
+    setProductForm({
+      id: product.id,
+      name: product.name,
+      description: product.description,
+      category: product.category,
+      brand: product.brand,
+      basePrice: product.basePrice,
+      images: product.images || []
+    });
+    setIsEditingProduct(true);
+    setShowProductDialog(true);
+  };
+  
   const createVariant = async (e) => {
     e.preventDefault();
     try {
-      await apiCall('/variants/create', 'POST', variantForm);
-      toast.success('Variant created successfully');
+      if (isEditingVariant) {
+        await apiCall('/variants/update', 'POST', variantForm);
+        toast.success('Variant updated successfully');
+      } else {
+        await apiCall('/variants/create', 'POST', variantForm);
+        toast.success('Variant created successfully');
+      }
       setShowVariantDialog(false);
-      setVariantForm({ productId: '', sku: '', barcode: '', size: '', color: '', additionalPrice: 0 });
+      setVariantForm({ id: '', productId: '', sku: '', barcode: '', size: '', color: '', additionalPrice: 0 });
+      setIsEditingVariant(false);
+      loadProducts();
     } catch (error) {
       toast.error(error.message);
     }
   };
   
+  const editVariant = (variant) => {
+    setVariantForm({
+      id: variant.id,
+      productId: variant.productId,
+      sku: variant.sku,
+      barcode: variant.barcode,
+      size: variant.size,
+      color: variant.color,
+      additionalPrice: variant.additionalPrice || 0
+    });
+    setIsEditingVariant(true);
+    setShowVariantDialog(true);
+  };
+  
   const createWarehouse = async (e) => {
     e.preventDefault();
     try {
-      await apiCall('/warehouses/create', 'POST', warehouseForm);
-      toast.success('Warehouse created successfully');
+      if (isEditingWarehouse) {
+        await apiCall('/warehouses/update', 'POST', warehouseForm);
+        toast.success('Warehouse updated successfully');
+      } else {
+        await apiCall('/warehouses/create', 'POST', warehouseForm);
+        toast.success('Warehouse created successfully');
+      }
       setShowWarehouseDialog(false);
-      setWarehouseForm({ name: '', location: '', type: 'warehouse', contactPerson: '', phone: '', address: '' });
+      setWarehouseForm({ id: '', name: '', location: '', type: 'warehouse', contactPerson: '', phone: '', address: '' });
+      setIsEditingWarehouse(false);
       loadWarehouses();
     } catch (error) {
       toast.error(error.message);
     }
+  };
+  
+  const editWarehouse = (warehouse) => {
+    setWarehouseForm({
+      id: warehouse.id,
+      name: warehouse.name,
+      location: warehouse.location,
+      type: warehouse.type,
+      contactPerson: warehouse.contactPerson,
+      phone: warehouse.phone,
+      address: warehouse.address
+    });
+    setIsEditingWarehouse(true);
+    setShowWarehouseDialog(true);
   };
   
   const createCategory = async (e) => {
