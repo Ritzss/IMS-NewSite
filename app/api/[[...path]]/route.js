@@ -402,6 +402,22 @@ export async function POST(request, { params }) {
       return Response.json({ message: 'Order created', id: orderId });
     }
     
+    if (path === 'orders/update') {
+      checkRole(user, ['admin', 'inventory_manager']);
+      
+      const { id, orderNumber, items, totalAmount, warehouseId, status } = body;
+      const oldOrder = await db.collection('orders').findOne({ id });
+      
+      await db.collection('orders').updateOne(
+        { id },
+        { $set: { orderNumber, items, totalAmount, warehouseId, status } }
+      );
+      
+      await logActivity(db, user.id, 'update', 'order', id, oldOrder, { orderNumber, items, totalAmount, warehouseId, status }, request.headers.get('x-forwarded-for'));
+      
+      return Response.json({ message: 'Order updated' });
+    }
+    
     if (path === 'orders/fulfill') {
       checkRole(user, ['admin', 'inventory_manager', 'warehouse_staff']);
       
