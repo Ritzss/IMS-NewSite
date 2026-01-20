@@ -53,6 +53,7 @@ export default function VastraDrobeIMS() {
   // Variants state
   const [variants, setVariants] = useState([]);
   const [variantForm, setVariantForm] = useState({
+    id: '',
     productId: '',
     sku: '',
     barcode: '',
@@ -61,6 +62,7 @@ export default function VastraDrobeIMS() {
     additionalPrice: 0
   });
   const [showVariantDialog, setShowVariantDialog] = useState(false);
+  const [isEditingVariant, setIsEditingVariant] = useState(false);
   
   // Warehouses state
   const [warehouses, setWarehouses] = useState([]);
