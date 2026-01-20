@@ -828,7 +828,7 @@ export default function VastraDrobeIMS() {
                     <SelectValue placeholder="All Warehouses" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">All Warehouses</SelectItem>
+                    <SelectItem value="all">All Warehouses</SelectItem>
                     {warehouses.map(w => (
                       <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>
                     ))}
