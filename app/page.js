@@ -1376,11 +1376,12 @@ export default function VastraDrobeIMS() {
                         <TableHead>Role</TableHead>
                         <TableHead>Status</TableHead>
                         <TableHead>Created</TableHead>
+                        <TableHead>Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {users.map((user) => (
-                        <TableRow key={user.id}>
+                        <TableRow key={user._id || user.id}>
                           <TableCell className="font-medium">{user.name}</TableCell>
                           <TableCell>{user.email}</TableCell>
                           <TableCell>
@@ -1392,6 +1393,17 @@ export default function VastraDrobeIMS() {
                             </Badge>
                           </TableCell>
                           <TableCell>{new Date(user.createdAt).toLocaleDateString()}</TableCell>
+                          <TableCell>
+                            {user._id !== currentUser?.id && (
+                              <Button 
+                                size="sm" 
+                                variant="destructive" 
+                                onClick={() => deleteUser(user._id)}
+                              >
+                                Delete
+                              </Button>
+                            )}
+                          </TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
