@@ -53,11 +53,13 @@ export async function POST(request, { params }) {
     const body = await request.json();
     const authHeader = request.headers.get('authorization');
     
+    console.log('IMS POST path:', path); // Debug
+    
     // =============================
     // PUBLIC ROUTES (No Auth)
     // =============================
     
-    if (path === 'ims/auth/login') {
+    if (path === 'auth/login') {
       const { email, password } = body;
       
       const user = await IMSAdminUser.findOne({ email, isActive: true });
