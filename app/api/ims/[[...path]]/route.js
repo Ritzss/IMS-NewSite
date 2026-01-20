@@ -99,7 +99,7 @@ export async function POST(request, { params }) {
     
     // ----- PRODUCTS -----
     
-    if (path === 'ims/products/list') {
+    if (path === 'products/list') {
       const { search, category, limit = 50, page = 1 } = body;
       
       const query = {};
@@ -124,7 +124,7 @@ export async function POST(request, { params }) {
       return Response.json({ products, total, page: parseInt(page), limit: parseInt(limit) });
     }
     
-    if (path === 'ims/products/create') {
+    if (path === 'products/create') {
       checkRole(user, ['admin']);
       
       const { name, price, mrp, category, subCategory, sizes, images, description, sku, brand } = body;
@@ -157,7 +157,7 @@ export async function POST(request, { params }) {
       });
     }
     
-    if (path === 'ims/products/update') {
+    if (path === 'products/update') {
       checkRole(user, ['admin']);
       
       const { productId, ...updates } = body;
@@ -180,12 +180,12 @@ export async function POST(request, { params }) {
     
     // ----- WAREHOUSES -----
     
-    if (path === 'ims/warehouses/list') {
+    if (path === 'warehouses/list') {
       const warehouses = await IMSWarehouse.find({ isActive: true }).lean();
       return Response.json({ warehouses });
     }
     
-    if (path === 'ims/warehouses/create') {
+    if (path === 'warehouses/create') {
       checkRole(user, ['admin']);
       
       const { name, code, location, type, contactPerson, phone, address } = body;
@@ -208,7 +208,7 @@ export async function POST(request, { params }) {
       });
     }
     
-    if (path === 'ims/warehouses/update') {
+    if (path === 'warehouses/update') {
       checkRole(user, ['admin']);
       
       const { warehouseId, ...updates } = body;
@@ -231,7 +231,7 @@ export async function POST(request, { params }) {
     
     // ----- INVENTORY -----
     
-    if (path === 'ims/inventory/add-stock') {
+    if (path === 'inventory/add-stock') {
       checkRole(user, ['admin', 'inventory_manager']);
       
       const { productId, warehouseId, size, quantity, reason, referenceNumber } = body;
@@ -252,7 +252,7 @@ export async function POST(request, { params }) {
       });
     }
     
-    if (path === 'ims/inventory/remove-stock') {
+    if (path === 'inventory/remove-stock') {
       checkRole(user, ['admin', 'inventory_manager']);
       
       const { productId, warehouseId, size, quantity, reason, referenceNumber } = body;
@@ -273,7 +273,7 @@ export async function POST(request, { params }) {
       });
     }
     
-    if (path === 'ims/inventory/transfer') {
+    if (path === 'inventory/transfer') {
       checkRole(user, ['admin', 'inventory_manager']);
       
       const { productId, fromWarehouseId, toWarehouseId, size, quantity, reason, referenceNumber } = body;
@@ -295,7 +295,7 @@ export async function POST(request, { params }) {
       });
     }
     
-    if (path === 'ims/inventory/record-sale') {
+    if (path === 'inventory/record-sale') {
       checkRole(user, ['admin', 'inventory_manager']);
       
       const { productId, warehouseId, size, quantity, orderNumber } = body;
@@ -315,7 +315,7 @@ export async function POST(request, { params }) {
       });
     }
     
-    if (path === 'ims/inventory/record-return') {
+    if (path === 'inventory/record-return') {
       checkRole(user, ['admin', 'inventory_manager']);
       
       const { productId, warehouseId, size, quantity, orderNumber } = body;
@@ -337,7 +337,7 @@ export async function POST(request, { params }) {
     
     // ----- ADMIN USERS -----
     
-    if (path === 'ims/admin-users/create') {
+    if (path === 'admin-users/create') {
       checkRole(user, ['admin']);
       
       const { email, password, name, role } = body;
@@ -389,7 +389,7 @@ export async function GET(request, { params }) {
     
     // ----- PRODUCTS -----
     
-    if (path === 'ims/products/list') {
+    if (path === 'products/list') {
       const search = searchParams.get('search') || '';
       const category = searchParams.get('category') || '';
       const limit = parseInt(searchParams.get('limit') || '50');
@@ -417,7 +417,7 @@ export async function GET(request, { params }) {
       return Response.json({ products, total, page, limit });
     }
     
-    if (path.startsWith('ims/products/') && !path.includes('list')) {
+    if (path.startsWith('products/') && !path.includes('list')) {
       const productId = parseInt(path.split('/')[2]);
       
       const product = await Product.findOne({ productId }).lean();
@@ -433,14 +433,14 @@ export async function GET(request, { params }) {
     
     // ----- WAREHOUSES -----
     
-    if (path === 'ims/warehouses/list') {
+    if (path === 'warehouses/list') {
       const warehouses = await IMSWarehouse.find({ isActive: true }).lean();
       return Response.json({ warehouses });
     }
     
     // ----- INVENTORY -----
     
-    if (path === 'ims/inventory/list') {
+    if (path === 'inventory/list') {
       const productId = searchParams.get('productId');
       const warehouseId = searchParams.get('warehouseId');
       const lowStock = searchParams.get('lowStock') === 'true';
@@ -472,7 +472,7 @@ export async function GET(request, { params }) {
       return Response.json({ inventory: enrichedInventory, total: inventory.length });
     }
     
-    if (path === 'ims/inventory/low-stock') {
+    if (path === 'inventory/low-stock') {
       const lowStockItems = await getLowStockItems();
       
       // Enrich with product details
@@ -491,7 +491,7 @@ export async function GET(request, { params }) {
     
     // ----- STOCK MOVEMENTS -----
     
-    if (path === 'ims/stock-movements/list') {
+    if (path === 'stock-movements/list') {
       const filters = {
         productId: searchParams.get('productId') ? parseInt(searchParams.get('productId')) : undefined,
         type: searchParams.get('type'),
@@ -519,7 +519,7 @@ export async function GET(request, { params }) {
     
     // ----- DASHBOARD -----
     
-    if (path === 'ims/dashboard/stats') {
+    if (path === 'dashboard/stats') {
       // Total stock value
       const inventories = await IMSInventory.find().lean();
       const productIds = [...new Set(inventories.map(inv => inv.productId))];
@@ -562,7 +562,7 @@ export async function GET(request, { params }) {
     
     // ----- ADMIN USERS -----
     
-    if (path === 'ims/admin-users/list') {
+    if (path === 'admin-users/list') {
       checkRole(user, ['admin']);
       
       const users = await IMSAdminUser.find({ isActive: true })
@@ -574,7 +574,7 @@ export async function GET(request, { params }) {
     
     // ----- ACTIVITY LOGS -----
     
-    if (path === 'ims/activity-logs/list') {
+    if (path === 'activity-logs/list') {
       checkRole(user, ['admin']);
       
       const limit = parseInt(searchParams.get('limit') || '100');
