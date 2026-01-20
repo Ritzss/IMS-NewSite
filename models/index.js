@@ -99,7 +99,7 @@ IMSInventorySchema.index({ productId: 1, warehouseId: 1, size: 1 }, { unique: tr
 
 // IMS Stock Movements (Audit trail)
 const IMSStockMovementSchema = new mongoose.Schema({
-  productId: { type: Number, required: true, ref: 'Product' },
+  productId: { type: Number, required: true },
   size: { type: String, required: true },
   fromWarehouseId: { type: mongoose.Schema.Types.ObjectId, ref: 'IMSWarehouse' },
   toWarehouseId: { type: mongoose.Schema.Types.ObjectId, ref: 'IMSWarehouse' },
