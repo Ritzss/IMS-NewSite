@@ -3,6 +3,10 @@
  * This seeds IMS-specific collections WITHOUT touching existing VastraDrobe data
  */
 
+// Load environment variables
+import dotenv from 'dotenv';
+dotenv.config();
+
 import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
 import { connectDB } from './lib/db.js';
