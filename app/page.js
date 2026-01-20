@@ -39,6 +39,7 @@ export default function VastraDrobeIMS() {
   // Products state
   const [products, setProducts] = useState([]);
   const [productForm, setProductForm] = useState({
+    id: '',
     name: '',
     description: '',
     category: '',
@@ -47,6 +48,7 @@ export default function VastraDrobeIMS() {
     images: []
   });
   const [showProductDialog, setShowProductDialog] = useState(false);
+  const [isEditingProduct, setIsEditingProduct] = useState(false);
   
   // Variants state
   const [variants, setVariants] = useState([]);
