@@ -1316,9 +1316,9 @@ export default function VastraDrobeIMS() {
                     </TableHeader>
                     <TableBody>
                       {activityLogs.map((log) => (
-                        <TableRow key={log.id}>
+                        <TableRow key={log._id || log.id}>
                           <TableCell>{new Date(log.timestamp).toLocaleString()}</TableCell>
-                          <TableCell>{log.userId}</TableCell>
+                          <TableCell>{log.userId?.name || log.userId?.email || 'Unknown'}</TableCell>
                           <TableCell>
                             <Badge>{log.action}</Badge>
                           </TableCell>
