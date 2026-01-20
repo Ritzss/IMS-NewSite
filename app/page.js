@@ -45,6 +45,8 @@ export default function VastraDrobeIMS() {
     category: '',
     brand: '',
     basePrice: 0,
+    mrp: 0,
+    sizes: '',
     images: []
   });
   const [showProductDialog, setShowProductDialog] = useState(false);
