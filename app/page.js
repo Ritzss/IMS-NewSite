@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Separator } from '@/components/ui/separator';
-import { Package, Warehouse, ArrowLeftRight, ShoppingCart, BarChart3, Users, LogOut, Plus, Search, AlertTriangle, TrendingUp, TrendingDown, Activity } from 'lucide-react';
+import { Package, Warehouse, ArrowLeftRight, ShoppingCart, BarChart3, Users, LogOut, Plus, Search, AlertTriangle, TrendingUp, TrendingDown, Activity, Edit, Pencil } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Toaster } from '@/components/ui/sonner';
 import { toast } from 'sonner';
