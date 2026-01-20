@@ -988,15 +988,16 @@ export default function VastraDrobeIMS() {
                       <TableHead>Quantity</TableHead>
                       <TableHead>Reorder Level</TableHead>
                       <TableHead>Status</TableHead>
+                      {(currentUser?.role === 'admin' || currentUser?.role === 'inventory_manager') && <TableHead>Actions</TableHead>}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {inventory.map((inv) => (
-                      <TableRow key={inv.id}>
+                      <TableRow key={inv._id || inv.id}>
                         <TableCell className="font-medium">{inv.product?.name || 'N/A'}</TableCell>
-                        <TableCell>{inv.variant?.size} / {inv.variant?.color}</TableCell>
-                        <TableCell>{inv.variant?.sku}</TableCell>
-                        <TableCell>{inv.warehouse?.name}</TableCell>
+                        <TableCell>{inv.size}</TableCell>
+                        <TableCell>{inv.productId}</TableCell>
+                        <TableCell>{inv.warehouseId?.name || inv.warehouse?.name}</TableCell>
                         <TableCell>{inv.quantity}</TableCell>
                         <TableCell>{inv.reorderLevel}</TableCell>
                         <TableCell>
@@ -1008,6 +1009,13 @@ export default function VastraDrobeIMS() {
                             <Badge variant="default">In Stock</Badge>
                           )}
                         </TableCell>
+                        {(currentUser?.role === 'admin' || currentUser?.role === 'inventory_manager') && (
+                          <TableCell>
+                            <Button size="sm" variant="ghost" onClick={() => editInventory(inv)}>
+                              <Pencil className="w-4 h-4" />
+                            </Button>
+                          </TableCell>
+                        )}
                       </TableRow>
                     ))}
                   </TableBody>
