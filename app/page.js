@@ -1022,6 +1022,49 @@ export default function VastraDrobeIMS() {
                 </Table>
               </CardContent>
             </Card>
+            
+            {/* Edit Inventory Dialog */}
+            <Dialog open={showEditInventoryDialog} onOpenChange={setShowEditInventoryDialog}>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Edit Inventory</DialogTitle>
+                  <DialogDescription>Update stock quantities and reorder levels</DialogDescription>
+                </DialogHeader>
+                <form onSubmit={updateInventory} className="space-y-4">
+                  <div>
+                    <Label>Quantity</Label>
+                    <Input 
+                      type="number" 
+                      value={editInventoryForm.quantity} 
+                      onChange={(e) => setEditInventoryForm({...editInventoryForm, quantity: parseInt(e.target.value)})} 
+                      required 
+                      min="0"
+                    />
+                  </div>
+                  <div>
+                    <Label>Reorder Level</Label>
+                    <Input 
+                      type="number" 
+                      value={editInventoryForm.reorderLevel} 
+                      onChange={(e) => setEditInventoryForm({...editInventoryForm, reorderLevel: parseInt(e.target.value)})} 
+                      required 
+                      min="0"
+                    />
+                  </div>
+                  <div>
+                    <Label>Reorder Quantity</Label>
+                    <Input 
+                      type="number" 
+                      value={editInventoryForm.reorderQuantity} 
+                      onChange={(e) => setEditInventoryForm({...editInventoryForm, reorderQuantity: parseInt(e.target.value)})} 
+                      required 
+                      min="0"
+                    />
+                  </div>
+                  <Button type="submit" className="w-full">Update Inventory</Button>
+                </form>
+              </DialogContent>
+            </Dialog>
           </TabsContent>
           
           {/* Stock Movements Tab */}
