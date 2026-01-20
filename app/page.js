@@ -436,9 +436,57 @@ export default function VastraDrobeIMS() {
   
   const createUser = async (userData) => {
     try {
-      await apiCall('/users/create', 'POST', userData);
+      await apiCall('/admin-users/create', 'POST', userData);
       toast.success('User created successfully');
       loadUsers();
+    } catch (error) {
+      toast.error(error.message);
+    }
+  };
+  
+  const deleteUser = async (userId) => {
+    if (!window.confirm('Are you sure you want to delete this user?')) return;
+    
+    try {
+      const response = await fetch(`${API_BASE}/admin-users/${userId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to delete user');
+      }
+      
+      toast.success('User deleted successfully');
+      loadUsers();
+    } catch (error) {
+      toast.error(error.message);
+    }
+  };
+  
+  const editInventory = (inv) => {
+    setEditInventoryForm({
+      inventoryId: inv._id,
+      quantity: inv.quantity,
+      reorderLevel: inv.reorderLevel,
+      reorderQuantity: inv.reorderQuantity
+    });
+    setShowEditInventoryDialog(true);
+  };
+  
+  const updateInventory = async (e) => {
+    e.preventDefault();
+    try {
+      await apiCall('/inventory/update', 'POST', editInventoryForm);
+      toast.success('Inventory updated successfully');
+      setShowEditInventoryDialog(false);
+      loadInventory();
+      loadDashboardStats();
     } catch (error) {
       toast.error(error.message);
     }
