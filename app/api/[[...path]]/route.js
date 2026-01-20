@@ -233,6 +233,22 @@ export async function POST(request, { params }) {
       return Response.json({ message: 'Warehouse created', id: warehouseId });
     }
     
+    if (path === 'warehouses/update') {
+      checkRole(user, ['admin']);
+      
+      const { id, name, location, type, contactPerson, phone, address } = body;
+      const oldWarehouse = await db.collection('warehouses').findOne({ id });
+      
+      await db.collection('warehouses').updateOne(
+        { id },
+        { $set: { name, location, type, contactPerson, phone, address, updatedAt: new Date() } }
+      );
+      
+      await logActivity(db, user.id, 'update', 'warehouse', id, oldWarehouse, { name, location, type, contactPerson, phone, address }, request.headers.get('x-forwarded-for'));
+      
+      return Response.json({ message: 'Warehouse updated' });
+    }
+    
     // Categories
     if (path === 'categories/create') {
       checkRole(user, ['admin', 'inventory_manager']);
