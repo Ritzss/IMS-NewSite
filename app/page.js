@@ -939,9 +939,24 @@ export default function VastraDrobeIMS() {
                             <Input value={productForm.brand} onChange={(e) => setProductForm({...productForm, brand: e.target.value})} required />
                           </div>
                         </div>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <Label>Price (₹)</Label>
+                            <Input type="number" value={productForm.basePrice} onChange={(e) => setProductForm({...productForm, basePrice: parseFloat(e.target.value)})} required />
+                          </div>
+                          <div>
+                            <Label>MRP (₹)</Label>
+                            <Input type="number" value={productForm.mrp} onChange={(e) => setProductForm({...productForm, mrp: parseFloat(e.target.value)})} placeholder="Optional" />
+                          </div>
+                        </div>
                         <div>
-                          <Label>Base Price (₹)</Label>
-                          <Input type="number" value={productForm.basePrice} onChange={(e) => setProductForm({...productForm, basePrice: parseFloat(e.target.value)})} required />
+                          <Label>Sizes</Label>
+                          <Input 
+                            placeholder="e.g., S,M,L,XL or 5-6Y,7-8Y,9-10Y" 
+                            value={productForm.sizes} 
+                            onChange={(e) => setProductForm({...productForm, sizes: e.target.value})} 
+                          />
+                          <p className="text-xs text-muted-foreground mt-1">Comma-separated list of sizes</p>
                         </div>
                         <Button type="submit" className="w-full">{isEditingProduct ? 'Update Product' : 'Create Product'}</Button>
                       </form>
