@@ -270,7 +270,7 @@ export default function VastraDrobeIMS() {
   
   const loadUsers = async () => {
     try {
-      const data = await apiCall('/users/list');
+      const data = await apiCall('/admin-users/list');
       setUsers(data.users);
     } catch (error) {
       toast.error('Failed to load users');
