@@ -1223,6 +1223,7 @@ export default function VastraDrobeIMS() {
                       <TableHead>Location</TableHead>
                       <TableHead>Contact</TableHead>
                       <TableHead>Phone</TableHead>
+                      {currentUser?.role === 'admin' && <TableHead>Actions</TableHead>}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -1237,6 +1238,13 @@ export default function VastraDrobeIMS() {
                         <TableCell>{warehouse.location}</TableCell>
                         <TableCell>{warehouse.contactPerson}</TableCell>
                         <TableCell>{warehouse.phone}</TableCell>
+                        {currentUser?.role === 'admin' && (
+                          <TableCell>
+                            <Button size="sm" variant="ghost" onClick={() => editWarehouse(warehouse)}>
+                              <Pencil className="w-4 h-4" />
+                            </Button>
+                          </TableCell>
+                        )}
                       </TableRow>
                     ))}
                   </TableBody>
