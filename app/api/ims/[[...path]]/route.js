@@ -588,6 +588,51 @@ export async function GET(request, { params }) {
       return Response.json({ logs, total: logs.length });
     }
     
+    // ----- CATEGORIES -----
+    
+    if (path === 'categories/list') {
+      // Get unique categories from existing products
+      const categories = await Product.distinct('category');
+      const categoriesArray = categories.filter(Boolean).map(cat => ({ 
+        id: cat, 
+        name: cat,
+        isActive: true
+      }));
+      return Response.json({ categories: categoriesArray });
+    }
+    
+    // ----- ORDERS -----
+    
+    if (path === 'orders/list') {
+      const limit = parseInt(searchParams.get('limit') || '50');
+      const page = parseInt(searchParams.get('page') || '1');
+      const status = searchParams.get('status');
+      
+      const query = {};
+      if (status) query.status = status;
+      
+      const orders = await Order.find(query)
+        .sort({ createdAt: -1 })
+        .limit(limit)
+        .skip((page - 1) * limit)
+        .lean();
+      
+      // Transform orders to match expected format
+      const transformedOrders = orders.map(order => ({
+        id: order._id.toString(),
+        orderNumber: order._id.toString().slice(-8),
+        items: order.items,
+        totalAmount: order.totalAmount,
+        status: order.status,
+        createdAt: order.createdAt,
+        fulfilledAt: order.updatedAt
+      }));
+      
+      const total = await Order.countDocuments(query);
+      
+      return Response.json({ orders: transformedOrders, total, page, limit });
+    }
+    
     return Response.json({ error: 'Route not found' }, { status: 404 });
     
   } catch (error) {
