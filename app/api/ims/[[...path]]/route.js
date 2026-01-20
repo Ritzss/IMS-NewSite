@@ -598,3 +598,48 @@ export async function GET(request, { params }) {
     }, { status: 500 });
   }
 }
+
+// Add missing DELETE handler
+export async function DELETE(request, { params }) {
+  try {
+    await connectDB();
+    
+    const path = params?.path?.join('/') || '';
+    const authHeader = request.headers.get('authorization');
+    const user = verifyToken(authHeader);
+    
+    // Delete admin user
+    if (path.startsWith('admin-users/')) {
+      checkRole(user, ['admin']);
+      
+      const userId = path.split('/')[1];
+      
+      // Prevent self-deletion
+      if (userId === user.id) {
+        return Response.json({ error: 'Cannot delete your own account' }, { status: 400 });
+      }
+      
+      const deletedUser = await IMSAdminUser.findByIdAndUpdate(
+        userId,
+        { $set: { isActive: false } },
+        { new: true }
+      );
+      
+      if (!deletedUser) {
+        return Response.json({ error: 'User not found' }, { status: 404 });
+      }
+      
+      await logActivity(user.id, 'delete', 'admin_user', userId, null, { isActive: false }, request.headers.get('x-forwarded-for'));
+      
+      return Response.json({ message: 'User deleted successfully' });
+    }
+    
+    return Response.json({ error: 'Route not found' }, { status: 404 });
+    
+  } catch (error) {
+    console.error('IMS DELETE Error:', error);
+    return Response.json({ 
+      error: error.message || 'Internal server error' 
+    }, { status: 500 });
+  }
+}
