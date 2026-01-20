@@ -912,16 +912,13 @@ export default function VastraDrobeIMS() {
                         <div className="grid grid-cols-2 gap-4">
                           <div>
                             <Label>Category</Label>
-                            <Select value={productForm.category} onValueChange={(val) => setProductForm({...productForm, category: val})}>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {categories.map(c => (
-                                  <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
+                            <Input 
+                              placeholder="e.g., Boys Clothing, Women Accessories" 
+                              value={productForm.category} 
+                              onChange={(e) => setProductForm({...productForm, category: e.target.value})} 
+                              required 
+                            />
+                            <p className="text-xs text-muted-foreground mt-1">Enter new or existing category name</p>
                           </div>
                           <div>
                             <Label>Brand</Label>
