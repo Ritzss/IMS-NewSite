@@ -303,15 +303,27 @@ export default function VastraDrobeIMS() {
   const createProduct = async (e) => {
     e.preventDefault();
     try {
+      // Convert sizes string to array
+      const sizesArray = productForm.sizes 
+        ? productForm.sizes.split(',').map(s => s.trim()).filter(Boolean)
+        : [];
+      
+      const productData = {
+        ...productForm,
+        sizes: sizesArray,
+        basePrice: parseFloat(productForm.basePrice) || 0,
+        mrp: parseFloat(productForm.mrp) || parseFloat(productForm.basePrice) || 0
+      };
+      
       if (isEditingProduct) {
-        await apiCall('/products/update', 'POST', productForm);
+        await apiCall('/products/update', 'POST', productData);
         toast.success('Product updated successfully');
       } else {
-        await apiCall('/products/create', 'POST', productForm);
+        await apiCall('/products/create', 'POST', productData);
         toast.success('Product created successfully');
       }
       setShowProductDialog(false);
-      setProductForm({ id: '', name: '', description: '', category: '', brand: '', basePrice: 0, images: [] });
+      setProductForm({ id: '', name: '', description: '', category: '', brand: '', basePrice: 0, mrp: 0, sizes: '', images: [] });
       setIsEditingProduct(false);
       loadProducts();
     } catch (error) {
