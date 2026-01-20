@@ -1113,16 +1113,16 @@ export default function VastraDrobeIMS() {
                     </div>
                     
                     <div className="grid grid-cols-2 gap-4">
-                      {movementForm.type !== 'in' && (
+                      {movementForm.type !== 'in' && movementForm.type !== 'return' && (
                         <div>
                           <Label>From Warehouse</Label>
                           <Select value={movementForm.fromWarehouseId} onValueChange={(val) => setMovementForm({...movementForm, fromWarehouseId: val})}>
                             <SelectTrigger>
-                              <SelectValue placeholder="Select" />
+                              <SelectValue placeholder="Select source warehouse" />
                             </SelectTrigger>
                             <SelectContent>
                               {warehouses.map(w => (
-                                <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>
+                                <SelectItem key={w._id || w.id} value={w._id || w.id}>{w.name}</SelectItem>
                               ))}
                             </SelectContent>
                           </Select>
@@ -1134,11 +1134,11 @@ export default function VastraDrobeIMS() {
                           <Label>To Warehouse</Label>
                           <Select value={movementForm.toWarehouseId} onValueChange={(val) => setMovementForm({...movementForm, toWarehouseId: val})}>
                             <SelectTrigger>
-                              <SelectValue placeholder="Select" />
+                              <SelectValue placeholder="Select destination warehouse" />
                             </SelectTrigger>
                             <SelectContent>
                               {warehouses.map(w => (
-                                <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>
+                                <SelectItem key={w._id || w.id} value={w._id || w.id}>{w.name}</SelectItem>
                               ))}
                             </SelectContent>
                           </Select>
