@@ -67,6 +67,7 @@ export default function VastraDrobeIMS() {
   // Warehouses state
   const [warehouses, setWarehouses] = useState([]);
   const [warehouseForm, setWarehouseForm] = useState({
+    id: '',
     name: '',
     location: '',
     type: 'warehouse',
@@ -75,6 +76,7 @@ export default function VastraDrobeIMS() {
     address: ''
   });
   const [showWarehouseDialog, setShowWarehouseDialog] = useState(false);
+  const [isEditingWarehouse, setIsEditingWarehouse] = useState(false);
   
   // Categories state
   const [categories, setCategories] = useState([]);
