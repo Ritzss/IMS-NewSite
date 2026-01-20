@@ -98,6 +98,17 @@ export default function VastraDrobeIMS() {
     reorderQuantity: 0
   });
   
+  // Add Inventory state
+  const [showAddInventoryDialog, setShowAddInventoryDialog] = useState(false);
+  const [addInventoryForm, setAddInventoryForm] = useState({
+    productId: '',
+    warehouseId: '',
+    size: '',
+    quantity: 0,
+    reorderLevel: 10,
+    reorderQuantity: 50
+  });
+  
   // Stock Movements state
   const [stockMovements, setStockMovements] = useState([]);
   const [movementForm, setMovementForm] = useState({
