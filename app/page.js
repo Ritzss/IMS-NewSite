@@ -17,7 +17,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Toaster } from '@/components/ui/sonner';
 import { toast } from 'sonner';
 
-const API_BASE = '/api';
+const API_BASE = '/api/ims';
 
 export default function VastraDrobeIMS() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
