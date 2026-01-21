@@ -27,6 +27,9 @@ import {
   getStockMovements,
 } from "@/services/inventoryService";
 import bcrypt from "bcryptjs";
+import { runTransaction } from "@/lib/runTransaction";
+import fs from "fs";
+import path from "path";
 
 // Helper to log activities
 async function logActivity(
@@ -57,17 +60,18 @@ export async function POST(request, { params }) {
   try {
     await connectDB();
 
-    const path = params?.path?.join("/") || "";
-    const body = await request.json();
+    const routePath = params?.path?.join("/") || "";
     const authHeader = request.headers.get("authorization");
 
-    console.log("IMS POST path:", path); // Debug
+    console.log("IMS POST path:", routePath); // Debug
 
     // =============================
     // PUBLIC ROUTES (No Auth)
     // =============================
 
-    if (path === "auth/login") {
+    if (routePath === "auth/login") {
+      const body = await request.json();
+
       const { email, password } = body;
 
       const user = await IMSAdminUser.findOne({ email, isActive: true });
@@ -115,7 +119,9 @@ export async function POST(request, { params }) {
 
     // ----- PRODUCTS -----
 
-    if (path === "products/list") {
+    if (routePath === "products/list") {
+      const body = await request.json();
+
       const { search, category, limit = 50, page = 1 } = body;
 
       const query = {};
@@ -145,69 +151,82 @@ export async function POST(request, { params }) {
       });
     }
 
-    if (path === "products/create") {
+    if (routePath === "products/create") {
       checkRole(user, ["admin"]);
 
-      const {
-        name,
-        price,
-        basePrice,
-        mrp,
-        category,
-        subCategory,
-        sizes,
-        images,
-        description,
-        sku,
-        brand,
-      } = body;
+      const formData = await request.formData();
 
-      // Get next productId
+      const name = formData.get("name");
+      const description = formData.get("description");
+      const category = formData.get("category");
+      const brand = formData.get("brand");
+      const price = Number(formData.get("price"));
+      const mrp = Number(formData.get("mrp"));
+
+      const sizes = (formData.get("sizes") || "")
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
+
+      const imageFiles = formData.getAll("images"); // File[]
+
+      if (!name || !price) {
+        return Response.json(
+          { error: "Name & price required" },
+          { status: 400 },
+        );
+      }
+
+      // 📁 Ensure upload folder exists
+      const uploadDir = path.join(process.cwd(), "public/uploads/products");
+      if (!fs.existsSync(uploadDir)) {
+        fs.mkdirSync(uploadDir, { recursive: true });
+      }
+
+      // 🖼️ Save images
+      const imagePaths = [];
+
+      for (const file of imageFiles) {
+        if (!file || typeof file === "string") continue;
+
+        const bytes = await file.arrayBuffer();
+        const buffer = Buffer.from(bytes);
+
+        const filename = `${Date.now()}-${file.name.replace(/\s+/g, "_")}`;
+        const filepath = path.join(uploadDir, filename);
+
+        fs.writeFileSync(filepath, buffer);
+
+        imagePaths.push(`/uploads/products/${filename}`);
+      }
+
       const lastProduct = await Product.findOne().sort({ productId: -1 });
       const nextProductId = (lastProduct?.productId || 0) + 1;
-
-      // Use basePrice if provided, otherwise use price
-      const productPrice = basePrice || price;
-
-      if (!productPrice) {
-        return Response.json({ error: "Price is required" }, { status: 400 });
-      }
 
       const product = await Product.create({
         productId: nextProductId,
         name,
-        price: productPrice,
-        mrp: mrp || productPrice,
+        description,
         category,
-        subCategory: subCategory || "",
-        sizes: sizes || [],
-        images: images || [],
-        description: description || "",
-        sku: sku || `SKU-${nextProductId}`,
-        brand: brand || "VastraDrobe",
+        brand,
+        price,
+        mrp: mrp || price,
+        sizes,
+        images: imagePaths, // ✅ NOW STORES
         stock: 0,
       });
-
-      await logActivity(
-        user.id,
-        "create",
-        "product",
-        product.productId.toString(),
-        null,
-        product.toObject(),
-        request.headers.get("x-forwarded-for"),
-      );
 
       return Response.json({
         message: "Product created successfully",
         productId: product.productId,
-        _id: product._id,
+        images: imagePaths,
       });
     }
 
-    if (path === "products/update") {
+    if (routePath === "products/update") {
+      const body = await request.json();
+
       checkRole(user, ["admin"]);
-      console.log(body);
       const { productId, ...updates } = body;
 
       const oldProduct = await Product.findOne({ productId }).lean();
@@ -239,12 +258,14 @@ export async function POST(request, { params }) {
 
     // ----- WAREHOUSES -----
 
-    if (path === "warehouses/list") {
+    if (routePath === "warehouses/list") {
       const warehouses = await IMSWarehouse.find({ isActive: true }).lean();
       return Response.json({ warehouses });
     }
 
-    if (path === "warehouses/create") {
+    if (routePath === "warehouses/create") {
+      const body = await request.json();
+
       checkRole(user, ["admin"]);
 
       const { name, code, location, type, contactPerson, phone, address } =
@@ -276,7 +297,9 @@ export async function POST(request, { params }) {
       });
     }
 
-    if (path === "warehouses/update") {
+    if (routePath === "warehouses/update") {
+      const body = await request.json();
+
       checkRole(user, ["admin"]);
 
       const { warehouseId, ...updates } = body;
@@ -309,7 +332,9 @@ export async function POST(request, { params }) {
     }
 
     // -------- STOCK MOVEMENT ----------
-    if (path === "stock-movements/create") {
+    if (routePath === "stock-movements/create") {
+      const body = await request.json();
+
       checkRole(user, ["admin", "inventory_manager"]);
 
       const {
@@ -323,73 +348,83 @@ export async function POST(request, { params }) {
         referenceNumber,
       } = body;
 
-      const qty = parseInt(quantity);
       const pid = parseInt(productId);
+      const qty = parseInt(quantity);
 
-      // 1️⃣ Create stock movement (AUDIT LOG)
-      const movement = await IMSStockMovement.create({
-        productId: pid,
-        size,
-        quantity: qty,
-        type,
-        fromWarehouseId: fromWarehouseId || null,
-        toWarehouseId: toWarehouseId || null,
-        performedBy: user.id,
-        reason: reason || "",
-        referenceNumber: referenceNumber || "",
-      });
-
-      // 2️⃣ INVENTORY UPDATE LOGIC
-      const adjustInventory = async (warehouseId, delta) => {
-        const inventory = await IMSInventory.findOneAndUpdate(
-          { productId: pid, warehouseId, size },
-          {
-            $inc: { quantity: delta },
-            $set: { lastUpdated: new Date(), updatedBy: user.id },
-          },
-          { new: true, upsert: true },
+      const result = await runTransaction(async (session) => {
+        // 1️⃣ Create movement (AUDIT)
+        const movement = await IMSStockMovement.create(
+          [
+            {
+              productId: pid,
+              size,
+              quantity: qty,
+              type,
+              fromWarehouseId: fromWarehouseId || null,
+              toWarehouseId: toWarehouseId || null,
+              performedBy: user.id,
+              reason: reason || "",
+              referenceNumber: referenceNumber || "",
+            },
+          ],
+          { session },
         );
 
-        return inventory;
-      };
+        // helper
+        const adjustInventory = async (warehouseId, delta) => {
+          return IMSInventory.findOneAndUpdate(
+            { productId: pid, warehouseId, size },
+            {
+              $inc: { quantity: delta },
+              $set: { lastUpdated: new Date(), updatedBy: user.id },
+            },
+            { new: true, upsert: true, session },
+          );
+        };
 
-      // IN / RETURN → ADD STOCK
-      if (["in", "return"].includes(type)) {
-        await adjustInventory(toWarehouseId, qty);
-      }
+        if (["in", "return"].includes(type)) {
+          await adjustInventory(toWarehouseId, qty);
+        }
 
-      // OUT / SALE / DAMAGED → REMOVE STOCK
-      if (["out", "sale", "damaged"].includes(type)) {
-        await adjustInventory(fromWarehouseId, -qty);
-      }
+        if (["out", "sale", "damaged"].includes(type)) {
+          await adjustInventory(fromWarehouseId, -qty);
+        }
 
-      // TRANSFER → MOVE STOCK
-      if (type === "transfer") {
-        await adjustInventory(fromWarehouseId, -qty);
-        await adjustInventory(toWarehouseId, qty);
-      }
+        if (type === "transfer") {
+          await adjustInventory(fromWarehouseId, -qty);
+          await adjustInventory(toWarehouseId, qty);
+        }
 
-      // 3️⃣ UPDATE PRODUCT TOTAL STOCK
-      const allInventory = await IMSInventory.find({ productId: pid });
-      const totalStock = allInventory.reduce(
-        (sum, inv) => sum + inv.quantity,
-        0,
-      );
+        // 3️⃣ Recalculate product stock
+        const inventories = await IMSInventory.find({ productId: pid }, null, {
+          session,
+        });
 
-      await Product.updateOne(
-        { productId: pid },
-        { $set: { stock: totalStock } },
-      );
+        const totalStock = inventories.reduce(
+          (sum, inv) => sum + inv.quantity,
+          0,
+        );
+
+        await Product.updateOne(
+          { productId: pid },
+          { $set: { stock: totalStock } },
+          { session },
+        );
+
+        return movement[0];
+      });
 
       return Response.json({
         message: "Stock movement created and inventory updated",
-        movement,
+        movement: result,
       });
     }
 
     // ----- INVENTORY -----
 
-    if (path === "inventory/add-stock") {
+    if (routePath === "inventory/add-stock") {
+      const body = await request.json();
+
       checkRole(user, ["admin", "inventory_manager"]);
 
       const {
@@ -417,7 +452,9 @@ export async function POST(request, { params }) {
       });
     }
 
-    if (path === "inventory/remove-stock") {
+    if (routePath === "inventory/remove-stock") {
+      const body = await request.json();
+
       checkRole(user, ["admin", "inventory_manager"]);
 
       const {
@@ -445,7 +482,9 @@ export async function POST(request, { params }) {
       });
     }
 
-    if (path === "inventory/transfer") {
+    if (routePath === "inventory/transfer") {
+      const body = await request.json();
+
       checkRole(user, ["admin", "inventory_manager"]);
 
       const {
@@ -475,7 +514,9 @@ export async function POST(request, { params }) {
       });
     }
 
-    if (path === "inventory/record-sale") {
+    if (routePath === "inventory/record-sale") {
+      const body = await request.json();
+
       checkRole(user, ["admin", "inventory_manager"]);
 
       const { productId, warehouseId, size, quantity, orderNumber } = body;
@@ -495,7 +536,9 @@ export async function POST(request, { params }) {
       });
     }
 
-    if (path === "inventory/record-return") {
+    if (routePath === "inventory/record-return") {
+      const body = await request.json();
+
       checkRole(user, ["admin", "inventory_manager"]);
 
       const { productId, warehouseId, size, quantity, orderNumber } = body;
@@ -515,7 +558,9 @@ export async function POST(request, { params }) {
       });
     }
 
-    if (path === "inventory/update") {
+    if (routePath === "inventory/update") {
+      const body = await request.json();
+
       checkRole(user, ["admin", "inventory_manager"]);
 
       const { inventoryId, quantity, reorderLevel, reorderQuantity } = body;
@@ -572,42 +617,67 @@ export async function POST(request, { params }) {
 
     // ----- ADMIN USERS -----
 
-    if (path === "admin-users/create") {
-      checkRole(user, ["admin"]);
+    if (routePath === "admin-users/create") {
+      try {
+        checkRole(user, ["admin"]);
 
-      const { email, password, name, role } = body;
+        const { name, email, password, role } = await request.json();
 
-      const existingUser = await IMSAdminUser.findOne({ email });
-      if (existingUser) {
-        return Response.json({ error: "User already exists" }, { status: 400 });
+        if (!name || !email || !password) {
+          return Response.json(
+            { error: "Name, email and password are required" },
+            { status: 400 },
+          );
+        }
+
+        const existingUser = await IMSAdminUser.findOne({ email });
+        if (existingUser) {
+          return Response.json(
+            { error: "User already exists" },
+            { status: 409 },
+          );
+        }
+
+        const hashedPassword = await bcrypt.hash(password, 10);
+
+        const newUser = await IMSAdminUser.create({
+          name,
+          email,
+          password: hashedPassword,
+          role: role || "inventory_manager",
+          isActive: true,
+        });
+
+        await logActivity(
+          user.id,
+          "create",
+          "admin_user",
+          newUser._id.toString(),
+          null,
+          { email, name, role: newUser.role },
+          request.headers.get("x-forwarded-for"),
+        );
+
+        return Response.json(
+          {
+            message: "User created successfully",
+            user: {
+              id: newUser._id,
+              name: newUser.name,
+              email: newUser.email,
+              role: newUser.role,
+            },
+          },
+          { status: 201 },
+        );
+      } catch (err) {
+        console.error(err);
+        return Response.json(
+          { error: err.message || "Internal server error" },
+          { status: 500 },
+        );
       }
-
-      const hashedPassword = await bcrypt.hash(password, 10);
-
-      const newUser = await IMSAdminUser.create({
-        email,
-        password: hashedPassword,
-        name,
-        role: role || "inventory_manager",
-      });
-
-      await logActivity(
-        user.id,
-        "create",
-        "admin_user",
-        newUser._id.toString(),
-        null,
-        { email, name, role },
-        request.headers.get("x-forwarded-for"),
-      );
-
-      return Response.json({
-        message: "Admin user created successfully",
-        userId: newUser._id.toString(),
-      });
     }
-
-    return Response.json({ error: "Route not found" }, { status: 404 });
   } catch (error) {
     console.error("IMS API Error:", error);
     return Response.json(
@@ -625,7 +695,7 @@ export async function GET(request, { params }) {
   try {
     await connectDB();
 
-    const path = params?.path?.join("/") || "";
+    const routePath = params?.path?.join("/") || "";
     const authHeader = request.headers.get("authorization");
     const url = new URL(request.url);
     const searchParams = url.searchParams;
@@ -635,7 +705,7 @@ export async function GET(request, { params }) {
 
     // ----- PRODUCTS -----
 
-    if (path === "products/list") {
+    if (routePath === "products/list") {
       const search = searchParams.get("search") || "";
       const category = searchParams.get("category") || "";
       const limit = parseInt(searchParams.get("limit") || "50");
@@ -663,8 +733,8 @@ export async function GET(request, { params }) {
       return Response.json({ products, total, page, limit });
     }
 
-    if (path.startsWith("products/") && !path.includes("list")) {
-      const productId = parseInt(path.split("/")[2]);
+    if (routePath.startsWith("products/") && !routePath.includes("list")) {
+      const productId = parseInt(routePath.split("/")[2]);
 
       const product = await Product.findOne({ productId }).lean();
       if (!product) {
@@ -679,14 +749,14 @@ export async function GET(request, { params }) {
 
     // ----- WAREHOUSES -----
 
-    if (path === "warehouses/list") {
+    if (routePath === "warehouses/list") {
       const warehouses = await IMSWarehouse.find({ isActive: true }).lean();
       return Response.json({ warehouses });
     }
 
     // ----- INVENTORY -----
 
-    if (path === "inventory/list") {
+    if (routePath === "inventory/list") {
       const productId = searchParams.get("productId");
       const warehouseId = searchParams.get("warehouseId");
       const lowStock = searchParams.get("lowStock") === "true";
@@ -723,7 +793,7 @@ export async function GET(request, { params }) {
       });
     }
 
-    if (path === "inventory/low-stock") {
+    if (routePath === "inventory/low-stock") {
       const lowStockItems = await getLowStockItems();
 
       // Enrich with product details
@@ -744,7 +814,7 @@ export async function GET(request, { params }) {
 
     // ----- STOCK MOVEMENTS -----
 
-    if (path === "stock-movements/list") {
+    if (routePath === "stock-movements/list") {
       const filters = {
         productId: searchParams.get("productId")
           ? parseInt(searchParams.get("productId"))
@@ -780,7 +850,7 @@ export async function GET(request, { params }) {
 
     // ----- DASHBOARD -----
 
-    if (path === "dashboard/stats") {
+    if (routePath === "dashboard/stats") {
       // Total stock value
       const inventories = await IMSInventory.find().lean();
       const productIds = [...new Set(inventories.map((inv) => inv.productId))];
@@ -831,7 +901,7 @@ export async function GET(request, { params }) {
 
     // ----- ADMIN USERS -----
 
-    if (path === "admin-users/list") {
+    if (routePath === "admin-users/list") {
       checkRole(user, ["admin"]);
 
       const users = await IMSAdminUser.find({ isActive: true })
@@ -843,7 +913,7 @@ export async function GET(request, { params }) {
 
     // ----- ACTIVITY LOGS -----
 
-    if (path === "activity-logs/list") {
+    if (routePath === "activity-logs/list") {
       checkRole(user, ["admin"]);
 
       const limit = parseInt(searchParams.get("limit") || "100");
@@ -859,7 +929,7 @@ export async function GET(request, { params }) {
 
     // ----- CATEGORIES -----
 
-    if (path === "categories/list") {
+    if (routePath === "categories/list") {
       // Get unique categories from existing products
       const categories = await Product.distinct("category");
       const categoriesArray = categories.filter(Boolean).map((cat) => ({
@@ -872,7 +942,7 @@ export async function GET(request, { params }) {
 
     // ----- ORDERS -----
 
-    if (path === "orders/list") {
+    if (routePath === "orders/list") {
       const limit = parseInt(searchParams.get("limit") || "50");
       const page = parseInt(searchParams.get("page") || "1");
       const status = searchParams.get("status");
@@ -921,15 +991,15 @@ export async function DELETE(request, { params }) {
   try {
     await connectDB();
 
-    const path = params?.path?.join("/") || "";
+    const routePath = params?.path?.join("/") || "";
     const authHeader = request.headers.get("authorization");
     const user = verifyToken(authHeader);
 
     // Delete admin user
-    if (path.startsWith("admin-users/")) {
+    if (routePath.startsWith("admin-users/")) {
       checkRole(user, ["admin"]);
 
-      const userId = path.split("/")[1];
+      const userId = routePath.split("/")[1];
 
       // Prevent self-deletion
       if (userId === user.id) {
@@ -963,7 +1033,7 @@ export async function DELETE(request, { params }) {
     }
     // ----- ACTIVITY LOGS -----
 
-    if (path === "activity-logs/list") {
+    if (routePath === "activity-logs/list") {
       checkRole(user, ["admin"]);
 
       const limit = parseInt(searchParams.get("limit") || "100");
@@ -979,7 +1049,7 @@ export async function DELETE(request, { params }) {
 
     // ----- CATEGORIES -----
 
-    if (path === "categories/list") {
+    if (routePath === "categories/list") {
       // Get unique categories from products
       const categories = await Product.distinct("category");
       const categoriesArray = categories.map((cat) => ({ name: cat, id: cat }));
@@ -988,7 +1058,7 @@ export async function DELETE(request, { params }) {
 
     // ----- ORDERS -----
 
-    if (path === "orders/list") {
+    if (routePath === "orders/list") {
       const limit = parseInt(searchParams.get("limit") || "50");
       const page = parseInt(searchParams.get("page") || "1");
       const status = searchParams.get("status");
@@ -1006,8 +1076,6 @@ export async function DELETE(request, { params }) {
 
       return Response.json({ orders, total, page, limit });
     }
-
-    return Response.json({ error: "Route not found" }, { status: 404 });
 
     return Response.json({ error: "Route not found" }, { status: 404 });
   } catch (error) {

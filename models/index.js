@@ -64,7 +64,7 @@ const IMSAdminUserSchema = new mongoose.Schema({
   name: { type: String, required: true },
   role: { 
     type: String, 
-    enum: ['admin', 'inventory_manager'], 
+    enum: ['admin', 'inventory_manager','store_manager'], 
     required: true 
   },
   isActive: { type: Boolean, default: true }

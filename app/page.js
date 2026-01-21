@@ -31,6 +31,7 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -175,6 +176,15 @@ export default function VastraDrobeIMS() {
 
   // Users state
   const [users, setUsers] = useState([]);
+  const [addUserOpen, setAddUserOpen] = useState(false);
+  const [addingUser, setAddingUser] = useState(false);
+
+  const [newUser, setNewUser] = useState({
+    name: "",
+    email: "",
+    password: "",
+    role: "inventory_manager",
+  });
 
   // Activity logs
   const [activityLogs, setActivityLogs] = useState([]);
@@ -202,6 +212,14 @@ export default function VastraDrobeIMS() {
     }
 
     const response = await fetch(`${API_BASE}${endpoint}`, options);
+
+    if (response.status === 401) {
+      localStorage.removeItem("token");
+      localStorage.removeItem("user");
+      window.location.href = "/";
+      return;
+    }
+
     const data = await response.json();
 
     if (!response.ok) {
@@ -328,30 +346,41 @@ export default function VastraDrobeIMS() {
   const createProduct = async (e) => {
     e.preventDefault();
     try {
-      // Convert sizes string to array
-      const sizesArray = productForm.sizes
-        ? productForm.sizes
-            .split(",")
-            .map((s) => s.trim())
-            .filter(Boolean)
-        : [];
+      const formData = new FormData();
 
-      const productData = {
-        ...productForm,
-        sizes: sizesArray,
-        price: parseFloat(productForm.price) || 0,
-        mrp: parseFloat(productForm.mrp) || parseFloat(productForm.price) || 0,
-      };
+      formData.append("name", productForm.name);
+      formData.append("description", productForm.description);
+      formData.append("category", productForm.category);
+      formData.append("brand", productForm.brand);
+      formData.append("price", productForm.price);
+      formData.append("mrp", productForm.mrp);
+      formData.append("sizes", productForm.sizes);
 
-      if (isEditingProduct) {
-        console.log(productData);
-        await apiCall("/products/update", "POST", productData);
-        toast.success("Product updated successfully");
-      } else {
-        await apiCall("/products/create", "POST", productData);
-        toast.success("Product created successfully");
-        setIsEditingProduct(!isEditingProduct);
+      productForm.images.forEach((file) => {
+        formData.append("images", file);
+      });
+
+      const res = await fetch("/api/ims/products/create", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        body: formData,
+      });
+
+      const text = await res.text();
+
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch (e) {
+        console.error("Non-JSON response from server:", text);
+        throw new Error("Server error while creating product");
       }
+      if (!res.ok) throw new Error(data.error || "Failed");
+
+      toast.success("Product created successfully");
+
       setShowProductDialog(false);
       setProductForm({
         id: "",
@@ -364,10 +393,10 @@ export default function VastraDrobeIMS() {
         sizes: "",
         images: [],
       });
-      setIsEditingProduct(false);
+
       loadProducts();
-    } catch (error) {
-      toast.error(error.message);
+    } catch (err) {
+      toast.error(err.message);
     }
   };
 
@@ -531,13 +560,38 @@ export default function VastraDrobeIMS() {
     }
   };
 
-  const createUser = async (userData) => {
+  const createUser = async () => {
     try {
-      await apiCall("/admin-users/create", "POST", userData);
-      toast.success("User created successfully");
-      loadUsers();
-    } catch (error) {
-      toast.error(error.message);
+      setAddingUser(true);
+
+      const res = await fetch("/api/ims/admin-users/create", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(newUser),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to create user");
+      }
+
+      setAddUserOpen(false);
+      setNewUser({
+        name: "",
+        email: "",
+        password: "",
+        role: "inventory_manager",
+      });
+
+      loadUsers(); // refresh table
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setAddingUser(false);
     }
   };
 
@@ -1043,6 +1097,25 @@ export default function VastraDrobeIMS() {
                             Comma-separated list of sizes
                           </p>
                         </div>
+                        <div>
+                          <Label>Product Images</Label>
+                          <Input
+                            type="file"
+                            multiple
+                            accept="image/*"
+                            onChange={(e) =>
+                              setProductForm({
+                                ...productForm,
+                                images: e.target.files
+                                  ? Array.from(e.target.files)
+                                  : [],
+                              })
+                            }
+                          />
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Upload product images (max 5)
+                          </p>
+                        </div>
                         <Button type="submit" className="w-full">
                           {isEditingProduct
                             ? "Update Product"
@@ -1064,6 +1137,7 @@ export default function VastraDrobeIMS() {
                 <Table>
                   <TableHeader>
                     <TableRow>
+                      <TableHead>Product Id</TableHead>
                       <TableHead>Name</TableHead>
                       <TableHead>Brand</TableHead>
                       <TableHead>Category</TableHead>
@@ -1078,6 +1152,7 @@ export default function VastraDrobeIMS() {
                     {products.map((product) => {
                       return (
                         <TableRow key={product.id}>
+                          <TableCell>{product.productId}</TableCell>
                           <TableCell className="font-medium">
                             {product.name}
                           </TableCell>
@@ -1906,6 +1981,77 @@ export default function VastraDrobeIMS() {
           {/* Users Tab */}
           {currentUser?.role === "admin" && (
             <TabsContent value="users" className="space-y-4">
+              <div className="flex justify-between">
+                <h2 className="text-xl font-semibold">Users</h2>
+                <Button onClick={() => setAddUserOpen(true)}>
+                  <Dialog open={addUserOpen} onOpenChange={setAddUserOpen}>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Add New User</DialogTitle>
+                        <DialogDescription>
+                          Create a new system user
+                        </DialogDescription>
+                      </DialogHeader>
+
+                      <div className="space-y-3">
+                        <Input
+                          placeholder="Full name"
+                          value={newUser.name}
+                          onChange={(e) =>
+                            setNewUser({ ...newUser, name: e.target.value })
+                          }
+                        />
+
+                        <Input
+                          type="email"
+                          placeholder="Email"
+                          value={newUser.email}
+                          onChange={(e) =>
+                            setNewUser({ ...newUser, email: e.target.value })
+                          }
+                        />
+
+                        <Input
+                          type="password"
+                          placeholder="Temporary password"
+                          value={newUser.password}
+                          onChange={(e) =>
+                            setNewUser({ ...newUser, password: e.target.value })
+                          }
+                        />
+
+                        <select
+                          className="w-full border rounded-md p-2"
+                          value={newUser.role}
+                          onChange={(e) =>
+                            setNewUser({ ...newUser, role: e.target.value })
+                          }
+                        >
+                          <option value="inventory_manager">
+                            Inventory Manager
+                          </option>
+                          <option value="store_manager">Store Manager</option>
+                          <option value="admin">Admin</option>
+                        </select>
+                      </div>
+
+                      <DialogFooter>
+                        <Button
+                          variant="secondary"
+                          onClick={() => setAddUserOpen(false)}
+                        >
+                          Cancel
+                        </Button>
+
+                        <Button disabled={addingUser} onClick={createUser}>
+                          {addingUser ? "Creating..." : "Create User"}
+                        </Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
+                  ADD USER
+                </Button>
+              </div>
               <Card>
                 <CardHeader>
                   <CardTitle>User Management</CardTitle>
