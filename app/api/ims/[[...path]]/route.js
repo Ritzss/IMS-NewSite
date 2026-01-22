@@ -9,7 +9,7 @@ import { connectDB } from "@/lib/db";
 import { verifyToken, checkRole, generateToken } from "@/lib/auth";
 import {
   Product,
-  Order,
+  Orders,
   IMSAdminUser,
   IMSWarehouse,
   IMSInventory,
@@ -950,7 +950,7 @@ export async function GET(request, { params }) {
       const query = {};
       if (status) query.status = status;
 
-      const orders = await Order.find(query)
+      const orders = await Orders.find(query)
         .sort({ createdAt: -1 })
         .limit(limit)
         .skip((page - 1) * limit)
@@ -967,7 +967,7 @@ export async function GET(request, { params }) {
         fulfilledAt: order.updatedAt,
       }));
 
-      const total = await Order.countDocuments(query);
+      const total = await Orders.countDocuments(query);
 
       return Response.json({ orders: transformedOrders, total, page, limit });
     }
@@ -1066,13 +1066,13 @@ export async function DELETE(request, { params }) {
       const query = {};
       if (status) query.status = status;
 
-      const orders = await Order.find(query)
+      const orders = await Orders.find(query)
         .sort({ createdAt: -1 })
         .limit(limit)
         .skip((page - 1) * limit)
         .lean();
 
-      const total = await Order.countDocuments(query);
+      const total = await Orders.countDocuments(query);
 
       return Response.json({ orders, total, page, limit });
     }

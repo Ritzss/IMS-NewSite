@@ -11,7 +11,6 @@ const ProductSchema = new mongoose.Schema({
   price: { type: Number, required: true },
   mrp: { type: Number },
   category: { type: String, required: true },
-  subCategory: { type: String },
   sizes: [{ type: String }], // e.g., ["5-6Y", "6-7Y", "8-9Y"]
   images: [{ type: String }],
   description: { type: String },
@@ -21,7 +20,7 @@ const ProductSchema = new mongoose.Schema({
   stock: { type: Number, default: 0 }, // Denormalized total stock (optional)
 }, { timestamps: true });
 
-// Order Schema (Existing - Read-only)
+// Orders Schema (Existing - Read-only)
 const OrderSchema = new mongoose.Schema({
   userId: { type: mongoose.Schema.Types.ObjectId, required: true },
   items: [{
@@ -134,8 +133,8 @@ const IMSActivityLogSchema = new mongoose.Schema({
 
 // Existing VastraDrobe models (read/write carefully)
 export const Product = mongoose.models.Product || mongoose.model('Product', ProductSchema, 'products');
-export const Order = mongoose.models.Order || mongoose.model('Order', OrderSchema, 'order');
-export const CustomerUser = mongoose.models.CustomerUser || mongoose.model('CustomerUser', CustomerUserSchema, 'user');
+export const Orders = mongoose.models.Orders || mongoose.model('Orders', OrderSchema, 'orders');
+export const CustomerUser = mongoose.models.CustomerUser || mongoose.model('CustomerUser', CustomerUserSchema, 'users');
 
 // IMS-specific models (new collections)
 export const IMSAdminUser = mongoose.models.IMSAdminUser || mongoose.model('IMSAdminUser', IMSAdminUserSchema, 'ims_admin_users');
