@@ -11,13 +11,19 @@ const ProductSchema = new mongoose.Schema({
   price: { type: Number, required: true },
   mrp: { type: Number },
   category: { type: String, required: true },
+  subcategory: { type: String },
   sizes: [{ type: String }], // e.g., ["5-6Y", "6-7Y", "8-9Y"]
+  color: [{ type: String }], 
   images: [{ type: String }],
   description: { type: String },
   // Optional fields that IMS can add without breaking VastraDrobe
   sku: { type: String },
   brand: { type: String },
   stock: { type: Number, default: 0 }, // Denormalized total stock (optional)
+   isActive: {
+    type: Boolean,
+    default: true,
+  },
 }, { timestamps: true });
 
 // Orders Schema (Existing - Read-only)

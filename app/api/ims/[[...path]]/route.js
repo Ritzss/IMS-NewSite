@@ -129,6 +129,7 @@ export async function POST(request, { params }) {
         query.$or = [
           { name: { $regex: search, $options: "i" } },
           { category: { $regex: search, $options: "i" } },
+          { subcategory: { $regex: search, $options: "i" } },
         ];
       }
       if (category) {
@@ -159,6 +160,7 @@ export async function POST(request, { params }) {
       const name = formData.get("name");
       const description = formData.get("description");
       const category = formData.get("category");
+      const subcategory = formData.get("subcategory");
       const brand = formData.get("brand");
       const price = Number(formData.get("price"));
       const mrp = Number(formData.get("mrp"));
@@ -166,6 +168,10 @@ export async function POST(request, { params }) {
       const sizes = (formData.get("sizes") || "")
         .split(",")
         .map((s) => s.trim())
+        .filter(Boolean);
+      const color = (formData.get("color") || "")
+        .split(",")
+        .map((c) => c.trim())
         .filter(Boolean);
 
       const imageFiles = formData.getAll("images"); // File[]
@@ -208,12 +214,15 @@ export async function POST(request, { params }) {
         name,
         description,
         category,
+        subcategory,
         brand,
         price,
         mrp: mrp || price,
         sizes,
+        color,
         images: imagePaths, // ✅ NOW STORES
         stock: 0,
+        isActive: true,
       });
 
       return Response.json({
@@ -700,6 +709,50 @@ export async function GET(request, { params }) {
     const url = new URL(request.url);
     const searchParams = url.searchParams;
 
+    // =============================
+    // PUBLIC ROUTES (No Auth)
+    // =============================
+
+    // GET /api/ims/public/products
+    if (routePath === "public/products") {
+      const category = searchParams.get("category");
+
+      const filter = { isActive: true };
+      if (category) filter.category = category;
+
+      const products = await Product.find(filter)
+        .select(
+          "productId name price mrp images category subcategory sizes stock",
+        )
+        .sort({ createdAt: -1 })
+        .lean();
+
+      return Response.json({ products });
+    }
+
+    // GET /api/ims/public/products/:productId
+    if (
+      routePath.startsWith("public/products/") &&
+      routePath.split("/").length === 3
+    ) {
+      const productId = parseInt(routePath.split("/")[2]);
+
+      const product = await Product.findOne({
+        productId,
+        isActive: true,
+      })
+        .select(
+          "productId name description price mrp images category subcategory sizes stock",
+        )
+        .lean();
+
+      if (!product) {
+        return Response.json({ error: "Product not found" }, { status: 404 });
+      }
+
+      return Response.json({ product });
+    }
+
     // Auth required for all GET routes
     const user = verifyToken(authHeader);
 
@@ -716,6 +769,7 @@ export async function GET(request, { params }) {
         query.$or = [
           { name: { $regex: search, $options: "i" } },
           { category: { $regex: search, $options: "i" } },
+          { subcategory: { $regex: search, $options: "i" } },
         ];
       }
       if (category) {
@@ -962,6 +1016,7 @@ export async function GET(request, { params }) {
         orderNumber: order._id.toString().slice(-8),
         items: order.items,
         totalAmount: order.totalAmount,
+        deliveryAddress: order.deliveryAddress,
         status: order.status,
         createdAt: order.createdAt,
         fulfilledAt: order.updatedAt,

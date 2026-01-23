@@ -78,32 +78,34 @@ export default function VastraDrobeIMS() {
   // Products state
   const [products, setProducts] = useState([]);
   const [productForm, setProductForm] = useState({
-    id: "",
+    productId: "",
     name: "",
     description: "",
     category: "",
+    subcategory: "",
     brand: "",
     price: 0,
     mrp: 0,
     sizes: "",
+    color: "",
     images: [],
   });
   const [showProductDialog, setShowProductDialog] = useState(false);
   const [isEditingProduct, setIsEditingProduct] = useState(false);
 
   // Variants state
-  const [variants, setVariants] = useState([]);
-  const [variantForm, setVariantForm] = useState({
-    id: "",
-    productId: "",
-    sku: "",
-    barcode: "",
-    size: "",
-    color: "",
-    additionalPrice: 0,
-  });
-  const [showVariantDialog, setShowVariantDialog] = useState(false);
-  const [isEditingVariant, setIsEditingVariant] = useState(false);
+  // const [variants, setVariants] = useState([]);
+  // const [variantForm, setVariantForm] = useState({
+  //   id: "",
+  //   productId: "",
+  //   sku: "",
+  //   barcode: "",
+  //   size: "",
+  //   color: "",
+  //   additionalPrice: 0,
+  // });
+  // const [showVariantDialog, setShowVariantDialog] = useState(false);
+  // const [isEditingVariant, setIsEditingVariant] = useState(false);
 
   // Warehouses state
   const [warehouses, setWarehouses] = useState([]);
@@ -351,10 +353,12 @@ export default function VastraDrobeIMS() {
       formData.append("name", productForm.name);
       formData.append("description", productForm.description);
       formData.append("category", productForm.category);
+      formData.append("subcategory", productForm.subcategory);
       formData.append("brand", productForm.brand);
       formData.append("price", productForm.price);
       formData.append("mrp", productForm.mrp);
       formData.append("sizes", productForm.sizes);
+      formData.append("color", productForm.color);
 
       productForm.images.forEach((file) => {
         formData.append("images", file);
@@ -383,15 +387,66 @@ export default function VastraDrobeIMS() {
 
       setShowProductDialog(false);
       setProductForm({
-        id: "",
+        productId: "",
         name: "",
         description: "",
         category: "",
+        subcategory: "",
         brand: "",
         price: 0,
         mrp: 0,
         sizes: "",
+        color: "",
         images: [],
+        isActive: true,
+      });
+
+      loadProducts();
+    } catch (err) {
+      toast.error(err.message);
+    }
+  };
+
+  const updateProduct = async (e) => {
+    e.preventDefault();
+
+    try {
+      const payload = {
+        productId: productForm.productId,
+        name: productForm.name,
+        description: productForm.description,
+        category: productForm.category,
+        subCategory: productForm.subCategory,
+        brand: productForm.brand,
+        price: productForm.price,
+        mrp: productForm.mrp,
+        sizes: productForm.sizes,
+        color: productForm.color
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean),
+      };
+
+      await apiCall("/products/update", "POST", payload);
+
+      toast.success("Product updated successfully");
+
+      setShowProductDialog(false);
+      setIsEditingProduct(false);
+
+      setProductForm({
+        productId: "",
+        name: "",
+        description: "",
+        category: "",
+        subCategory: "",
+        brand: "",
+        price: 0,
+        mrp: 0,
+        sizes: "",
+        color: "",
+        images: [],
+        isActive: true,
       });
 
       loadProducts();
@@ -404,56 +459,61 @@ export default function VastraDrobeIMS() {
     setProductForm({
       productId: product.productId,
       name: product.name,
-      description: product.description,
+      description: product.description || "",
       category: product.category,
-      brand: product.brand,
+      subCategory: product.subCategory || "",
+      brand: product.brand || "",
       price: product.price,
-      images: product.images || [],
+      mrp: product.mrp || product.price,
+      sizes: (product.sizes || []).join(","),
+      color: (product.color || []).join(","),
+      images: [], // don’t preload files
     });
+
     setIsEditingProduct(true);
     setShowProductDialog(true);
   };
 
-  const createVariant = async (e) => {
-    e.preventDefault();
-    try {
-      if (isEditingVariant) {
-        await apiCall("/variants/update", "POST", variantForm);
-        toast.success("Variant updated successfully");
-      } else {
-        await apiCall("/variants/create", "POST", variantForm);
-        toast.success("Variant created successfully");
-      }
-      setShowVariantDialog(false);
-      setVariantForm({
-        id: "",
-        productId: "",
-        sku: "",
-        barcode: "",
-        size: "",
-        color: "",
-        additionalPrice: 0,
-      });
-      setIsEditingVariant(false);
-      loadProducts();
-    } catch (error) {
-      toast.error(error.message);
-    }
-  };
+  // const createVariant = async (e) => {
+  //   e.preventDefault();
+  //   try {
+  //     if (isEditingVariant) {
+  //       await apiCall("/variants/update", "POST", variantForm);
+  //       toast.success("Variant updated successfully");
+  //     } else {
+  //       await apiCall("/variants/create", "POST", variantForm);
+  //       toast.success("Variant created successfully");
+  //     }
+  //     setShowVariantDialog(false);
+  //     setVariantForm({
+  //       id: "",
+  //       productId: "",
+  //       sku: "",
+  //       barcode: "",
+  //       size: "",
+  //       color: "",
+  //       additionalPrice: 0,
+  //     });
+  //     setIsEditingVariant(false);
+  //     loadProducts();
+  //   } catch (error) {
+  //     toast.error(error.message);
+  //   }
+  // };
 
-  const editVariant = (variant) => {
-    setVariantForm({
-      id: variant.id,
-      productId: variant.productId,
-      sku: variant.sku,
-      barcode: variant.barcode,
-      size: variant.size,
-      color: variant.color,
-      additionalPrice: variant.additionalPrice || 0,
-    });
-    setIsEditingVariant(true);
-    setShowVariantDialog(true);
-  };
+  // const editVariant = (variant) => {
+  //   setVariantForm({
+  //     id: variant.id,
+  //     productId: variant.productId,
+  //     sku: variant.sku,
+  //     barcode: variant.barcode,
+  //     size: variant.size,
+  //     color: variant.color,
+  //     additionalPrice: variant.additionalPrice || 0,
+  //   });
+  //   setIsEditingVariant(true);
+  //   setShowVariantDialog(true);
+  // };
 
   const createWarehouse = async (e) => {
     e.preventDefault();
@@ -972,8 +1032,7 @@ export default function VastraDrobeIMS() {
                 </Button>
               </div>
 
-              {(currentUser?.role === "admin" ||
-                currentUser?.role === "inventory_manager") && (
+              {(currentUser?.role === "admin" ) && (
                 <div className="flex gap-2">
                   <Dialog
                     open={showProductDialog}
@@ -993,7 +1052,12 @@ export default function VastraDrobeIMS() {
                             : "Add New Product"}
                         </DialogTitle>
                       </DialogHeader>
-                      <form onSubmit={createProduct} className="space-y-4">
+                      <form
+                        onSubmit={
+                          isEditingProduct ? updateProduct : createProduct
+                        }
+                        className="space-y-4"
+                      >
                         <div>
                           <Label>Product Name</Label>
                           <Input
@@ -1036,6 +1100,35 @@ export default function VastraDrobeIMS() {
                             <p className="text-xs text-muted-foreground mt-1">
                               Enter new or existing category name
                             </p>
+                          </div>
+                          <div>
+                            <Label>Sub Category</Label>
+                            <Input
+                              placeholder="e.g., Boys Clothing, Women Accessories"
+                              value={productForm.subcategory}
+                              onChange={(e) =>
+                                setProductForm({
+                                  ...productForm,
+                                  subcategory: e.target.value,
+                                })
+                              }
+                              required
+                            />
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Enter new or existing subcategory name
+                            </p>
+                          </div>
+                          <div>
+                            <Label>Color</Label>
+                            <Input
+                              value={productForm.color}
+                              onChange={(e) =>
+                                setProductForm({
+                                  ...productForm,
+                                  color: e.target.value,
+                                })
+                              }
+                            />
                           </div>
                           <div>
                             <Label>Brand</Label>
@@ -1141,6 +1234,7 @@ export default function VastraDrobeIMS() {
                       <TableHead>Name</TableHead>
                       <TableHead>Brand</TableHead>
                       <TableHead>Category</TableHead>
+                      <TableHead>SubCategory</TableHead>
                       <TableHead>Base Price</TableHead>
                       <TableHead>Created</TableHead>
                       {currentUser?.role === "admin" && (
@@ -1158,6 +1252,7 @@ export default function VastraDrobeIMS() {
                           </TableCell>
                           <TableCell>{product.brand}</TableCell>
                           <TableCell>{product.category}</TableCell>
+                          <TableCell>{product.subcategory}</TableCell>
                           <TableCell>₹{product.price}</TableCell>
                           <TableCell>
                             {new Date(product.createdAt).toLocaleDateString()}
@@ -1753,6 +1848,10 @@ export default function VastraDrobeIMS() {
 
           {/* Orders Tab */}
           <TabsContent value="orders" className="space-y-4">
+            <Button onClick={loadOrders} variant="outline">
+              <Search className="w-4 h-4 mr-2" />
+              Refresh
+            </Button>
             <Card>
               <CardHeader>
                 <CardTitle>Orders</CardTitle>
@@ -1764,7 +1863,8 @@ export default function VastraDrobeIMS() {
                     <TableRow>
                       <TableHead>Order Number</TableHead>
                       <TableHead>Total Amount</TableHead>
-                      <TableHead>Items</TableHead>
+                      <TableHead>Items Details</TableHead>
+                      <TableHead>Delivery Address</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Created</TableHead>
                       <TableHead>Actions</TableHead>
@@ -1777,7 +1877,15 @@ export default function VastraDrobeIMS() {
                           {order.orderNumber}
                         </TableCell>
                         <TableCell>₹{order.totalAmount}</TableCell>
-                        <TableCell>{order.items?.length || 0}</TableCell>
+                        <TableCell>
+                          Product Ids{" : "}
+                          {order?.items.map((p) => p.productId).join(", ") || 0}
+                        </TableCell>
+                        <TableCell>
+                          {order?.deliveryAddress
+                            ? `${order.deliveryAddress.address} (${order.deliveryAddress.phone})`
+                            : "—"}
+                        </TableCell>
                         <TableCell>
                           <Badge
                             variant={
