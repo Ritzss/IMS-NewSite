@@ -28,8 +28,7 @@ import {
 } from "@/services/inventoryService";
 import bcrypt from "bcryptjs";
 import { runTransaction } from "@/lib/runTransaction";
-import fs from "fs";
-import path from "path";
+import  cloudinary from "@/lib/cloudinary";
 
 // Helper to log activities
 async function logActivity(
@@ -183,13 +182,6 @@ export async function POST(request, { params }) {
         );
       }
 
-      // 📁 Ensure upload folder exists
-      const uploadDir = path.join(process.cwd(), "public/uploads/products");
-      if (!fs.existsSync(uploadDir)) {
-        fs.mkdirSync(uploadDir, { recursive: true });
-      }
-
-      // 🖼️ Save images
       const imagePaths = [];
 
       for (const file of imageFiles) {
@@ -198,12 +190,13 @@ export async function POST(request, { params }) {
         const bytes = await file.arrayBuffer();
         const buffer = Buffer.from(bytes);
 
-        const filename = `${Date.now()}-${file.name.replace(/\s+/g, "_")}`;
-        const filepath = path.join(uploadDir, filename);
+        const base64 = `data:${file.type};base64,${buffer.toString("base64")}`;
 
-        fs.writeFileSync(filepath, buffer);
+        const uploadRes = await cloudinary.uploader.upload(base64, {
+          folder: "products",
+        });
 
-        imagePaths.push(`/uploads/products/${filename}`);
+        imagePaths.push(uploadRes.secure_url); // ✅ PUBLIC URL
       }
 
       const lastProduct = await Product.findOne().sort({ productId: -1 });
