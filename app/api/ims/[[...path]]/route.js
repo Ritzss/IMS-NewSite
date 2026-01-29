@@ -28,7 +28,7 @@ import {
 } from "@/services/inventoryService";
 import bcrypt from "bcryptjs";
 import { runTransaction } from "@/lib/runTransaction";
-import  cloudinary from "@/lib/cloudinary";
+import cloudinary from "@/lib/cloudinary";
 
 // Helper to log activities
 async function logActivity(
@@ -614,6 +614,107 @@ export async function POST(request, { params }) {
       return Response.json({
         message: "Inventory updated successfully",
         inventory,
+      });
+    }
+
+    // ----- ORDERS -----
+    // POST /api/ims/orders/fulfill
+    if (routePath === "orders/fulfill") {
+      checkRole(user, ["admin", "inventory_manager"]);
+
+      const { orderId } = await request.json();
+
+      if (!orderId) {
+        return Response.json(
+          { error: "Order ID is required" },
+          { status: 400 },
+        );
+      }
+
+      const result = await runTransaction(async (session) => {
+        const order = await Orders.findById(orderId).session(session);
+
+        if (!order) throw new Error("Order not found");
+        if (order.status === "fulfilled") {
+          throw new Error("Order already fulfilled");
+        }
+
+        for (const item of order.items) {
+          const productId = Number(item.productId);
+
+          // ✅ normalize quantity
+          const quantity = Number(item.quantity) || Number(item.qty) || 1;
+
+          if (!productId || !quantity || isNaN(quantity)) {
+            console.error("Invalid order item detected:", item);
+            throw new Error("Invalid order item data");
+          }
+
+          // ✅ fallback warehouse
+          const warehouseId =
+            item.warehouseId || (await IMSWarehouse.findOne().lean())?._id;
+
+          if (!warehouseId) {
+            throw new Error("No warehouse available to fulfill order");
+          }
+
+          // ✅ size fallback
+          const size = item.size || "FREE";
+
+          // 🔻 Deduct inventory
+          await IMSInventory.findOneAndUpdate(
+            { productId, warehouseId, size },
+            {
+              $inc: { quantity: -quantity },
+              $set: { updatedBy: user.id, lastUpdated: new Date() },
+            },
+            { session, upsert: true },
+          );
+
+          // 📦 Stock movement log
+          await IMSStockMovement.create(
+            [
+              {
+                productId,
+                size,
+                quantity,
+                type: "sale",
+                fromWarehouseId: warehouseId,
+                performedBy: user.id,
+                referenceNumber: order._id.toString(),
+              },
+            ],
+            { session },
+          );
+        }
+
+        await Orders.updateOne(
+          { _id: order._id },
+          {
+            $set: {
+              status: "fulfilled",
+              fulfilledAt: new Date(),
+            },
+          },
+          { session },
+        );
+
+        return order;
+      });
+
+      await logActivity(
+        user.id,
+        "fulfill",
+        "order",
+        orderId,
+        null,
+        { status: "fulfilled" },
+        request.headers.get("x-forwarded-for"),
+      );
+
+      return Response.json({
+        message: "Order fulfilled successfully",
+        order: result,
       });
     }
 
