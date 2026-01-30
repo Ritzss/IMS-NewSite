@@ -811,6 +811,11 @@ export async function GET(request, { params }) {
     if (routePath === "public/products") {
       const category = searchParams.get("category");
 
+      // pagination params
+      const page = Math.max(parseInt(searchParams.get("page")) || 1, 1);
+      const limit = Math.min(parseInt(searchParams.get("limit")) || 8, 50);
+      const skip = (page - 1) * limit;
+
       const filter = { isActive: true };
       if (category) filter.category = category;
 
@@ -819,26 +824,25 @@ export async function GET(request, { params }) {
           "productId name price mrp images category subcategory sizes stock",
         )
         .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
         .lean();
 
       return Response.json({ products });
     }
 
     // GET /api/ims/public/products/:productId
-    if (
-      routePath.startsWith("public/products/") &&
-      routePath.split("/").length === 3
-    ) {
-      const productId = parseInt(routePath.split("/")[2]);
+    if (routePath.startsWith("public/products/")) {
+      const productId = Number(routePath.split("/")[2]);
+
+      if (!Number.isInteger(productId)) {
+        return Response.json({ error: "Invalid product ID" }, { status: 400 });
+      }
 
       const product = await Product.findOne({
         productId,
         isActive: true,
-      })
-        .select(
-          "productId name description price mrp images category subcategory sizes stock",
-        )
-        .lean();
+      }).lean();
 
       if (!product) {
         return Response.json({ error: "Product not found" }, { status: 404 });
