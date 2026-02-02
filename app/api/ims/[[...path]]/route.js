@@ -831,6 +831,15 @@ export async function GET(request, { params }) {
       return Response.json({ products });
     }
 
+     if (routePath === "public/products/latest") {
+      const products = await Product.find({ isActive: true })
+        .sort({ createdAt: -1 })
+        .limit(6)
+        .lean();
+
+      return Response.json({ products });
+    }
+
     // GET /api/ims/public/products/:productId
     if (routePath.startsWith("public/products/")) {
       const productId = Number(routePath.split("/")[2]);

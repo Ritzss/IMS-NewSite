@@ -1032,7 +1032,7 @@ export default function VastraDrobeIMS() {
                 </Button>
               </div>
 
-              {(currentUser?.role === "admin" ) && (
+              {currentUser?.role === "admin" && (
                 <div className="flex gap-2">
                   <Dialog
                     open={showProductDialog}
@@ -1878,8 +1878,12 @@ export default function VastraDrobeIMS() {
                         </TableCell>
                         <TableCell>₹{order.totalAmount}</TableCell>
                         <TableCell>
-                          Product Ids{" : "}
-                          {order?.items.map((p) => p.productId).join(", ") || 0}
+                          Products{" : "}
+                          {order?.items?.length
+                            ? order.items
+                                .map((p) => `ID ${p.productId} (Qty: ${p.qty})`)
+                                .join(", ")
+                            : 0}
                         </TableCell>
                         <TableCell>
                           {order?.deliveryAddress
