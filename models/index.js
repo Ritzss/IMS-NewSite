@@ -29,12 +29,15 @@ const ProductSchema = new mongoose.Schema({
 // Orders Schema (Existing - Read-only)
 const OrderSchema = new mongoose.Schema({
   userId: { type: mongoose.Schema.Types.ObjectId, required: true },
-  items: [{
-    productId: { type: Number, required: true },
-    title: { type: String, required: true },
-    price: { type: Number, required: true },
-    qty: { type: Number, required: true }
-  }],
+  items: [
+  {
+    productId: {type:Number},
+    title: { type: String, required: false },
+    name: { type: String }, // backward compatibility
+    price: {type:Number},
+    qty: {type:Number},
+  },
+],
   totalAmount: { type: Number, required: true },
   status: { type: String, required: true },
   deliveryAddress: {

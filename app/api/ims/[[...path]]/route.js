@@ -618,105 +618,111 @@ export async function POST(request, { params }) {
     }
 
     // ----- ORDERS -----
-    // POST /api/ims/orders/fulfill
-    if (routePath === "orders/fulfill") {
-      checkRole(user, ["admin", "inventory_manager"]);
+// POST /api/ims/orders/update-status
+if (routePath === "orders/update-status") {
+  checkRole(user, ["admin", "inventory_manager"]);
 
-      const { orderId } = await request.json();
+  const { orderId, newStatus } = await request.json();
 
-      if (!orderId) {
-        return Response.json(
-          { error: "Order ID is required" },
-          { status: 400 },
+  if (!orderId || !newStatus) {
+    return Response.json(
+      { error: "Order ID and new status are required" },
+      { status: 400 }
+    );
+  }
+
+  const STATUS_FLOW = [
+    "pending",
+    "paid",
+    "packing",
+    "shipping",
+    "delivered",
+  ];
+
+  if (!STATUS_FLOW.includes(newStatus)) {
+    return Response.json(
+      { error: "Invalid order status" },
+      { status: 400 }
+    );
+  }
+
+  const order = await Orders.findById(orderId);
+  if (!order) {
+    return Response.json({ error: "Order not found" }, { status: 404 });
+  }
+
+  const currentIndex = STATUS_FLOW.indexOf(order.status);
+  const nextIndex = STATUS_FLOW.indexOf(newStatus);
+
+  if (nextIndex <= currentIndex) {
+    return Response.json(
+      { error: "Invalid status transition" },
+      { status: 400 }
+    );
+  }
+
+  // 🔻 Deduct inventory ONLY when moving to PACKING
+  if (newStatus === "packing") {
+    await runTransaction(async (session) => {
+      for (const item of order.items) {
+        const productId = Number(item.productId);
+        const quantity = Number(item.qty || item.quantity || 1);
+        const size = item.size || "FREE";
+
+        const warehouse =
+          item.warehouseId ||
+          (await IMSWarehouse.findOne().session(session))?._id;
+
+        if (!warehouse) {
+          throw new Error("No warehouse available");
+        }
+
+        await IMSInventory.findOneAndUpdate(
+          { productId, warehouseId: warehouse, size },
+          {
+            $inc: { quantity: -quantity },
+            $set: { updatedBy: user.id, lastUpdated: new Date() },
+          },
+          { session }
+        );
+
+        await IMSStockMovement.create(
+          [
+            {
+              productId,
+              size,
+              quantity,
+              type: "sale",
+              fromWarehouseId: warehouse,
+              performedBy: user.id,
+              referenceNumber: order._id.toString(),
+            },
+          ],
+          { session }
         );
       }
+    });
+  }
 
-      const result = await runTransaction(async (session) => {
-        const order = await Orders.findById(orderId).session(session);
+  order.status = newStatus;
+  await order.save();
 
-        if (!order) throw new Error("Order not found");
-        if (order.status === "fulfilled") {
-          throw new Error("Order already fulfilled");
-        }
+  await logActivity(
+    user.id,
+    "update_status",
+    "order",
+    orderId,
+    null,
+    { status: newStatus },
+    request.headers.get("x-forwarded-for")
+  );
 
-        for (const item of order.items) {
-          const productId = Number(item.productId);
+  return Response.json({
+    message: "Order status updated",
+    status: order.status,
+  });
+}
 
-          // ✅ normalize quantity
-          const quantity = Number(item.quantity) || Number(item.qty) || 1;
-
-          if (!productId || !quantity || isNaN(quantity)) {
-            console.error("Invalid order item detected:", item);
-            throw new Error("Invalid order item data");
-          }
-
-          // ✅ fallback warehouse
-          const warehouseId =
-            item.warehouseId || (await IMSWarehouse.findOne().lean())?._id;
-
-          if (!warehouseId) {
-            throw new Error("No warehouse available to fulfill order");
-          }
-
-          // ✅ size fallback
-          const size = item.size || "FREE";
-
-          // 🔻 Deduct inventory
-          await IMSInventory.findOneAndUpdate(
-            { productId, warehouseId, size },
-            {
-              $inc: { quantity: -quantity },
-              $set: { updatedBy: user.id, lastUpdated: new Date() },
-            },
-            { session, upsert: true },
-          );
-
-          // 📦 Stock movement log
-          await IMSStockMovement.create(
-            [
-              {
-                productId,
-                size,
-                quantity,
-                type: "sale",
-                fromWarehouseId: warehouseId,
-                performedBy: user.id,
-                referenceNumber: order._id.toString(),
-              },
-            ],
-            { session },
-          );
-        }
-
-        await Orders.updateOne(
-          { _id: order._id },
-          {
-            $set: {
-              status: "fulfilled",
-              fulfilledAt: new Date(),
-            },
-          },
-          { session },
-        );
-
-        return order;
-      });
-
-      await logActivity(
-        user.id,
-        "fulfill",
-        "order",
-        orderId,
-        null,
-        { status: "fulfilled" },
-        request.headers.get("x-forwarded-for"),
-      );
-
-      return Response.json({
-        message: "Order fulfilled successfully",
-        order: result,
-      });
-    }
 
     // ----- ADMIN USERS -----
 
@@ -797,8 +803,8 @@ export async function POST(request, { params }) {
 export async function GET(request, { params }) {
   try {
     await connectDB();
-
-    const routePath = params?.path?.join("/") || "";
+    const rawPath = params?.path?.join("/") || "";
+    const routePath = rawPath.replace(/^ims\//, "");
     const authHeader = request.headers.get("authorization");
     const url = new URL(request.url);
     const searchParams = url.searchParams;
@@ -809,9 +815,31 @@ export async function GET(request, { params }) {
 
     // GET /api/ims/public/products
     if (routePath === "public/products") {
+      // ✅ FAVORITES SUPPORT (ids=1,2,3)
+      const idsParam = searchParams.get("ids");
+      if (idsParam) {
+        const ids = idsParam
+          .split(",")
+          .map((id) => Number(id))
+          .filter(Number.isInteger);
+
+        if (ids.length === 0) {
+          return Response.json({ products: [] });
+        }
+
+        const products = await Product.find({
+          productId: { $in: ids },
+          isActive: true,
+        })
+          .select("productId name price mrp images category subcategory stock")
+          .lean();
+
+        return Response.json({ products });
+      }
+
+      // 🔁 existing logic untouched
       const category = searchParams.get("category");
 
-      // pagination params
       const page = Math.max(parseInt(searchParams.get("page")) || 1, 1);
       const limit = Math.min(parseInt(searchParams.get("limit")) || 8, 50);
       const skip = (page - 1) * limit;
@@ -831,7 +859,7 @@ export async function GET(request, { params }) {
       return Response.json({ products });
     }
 
-     if (routePath === "public/products/latest") {
+    if (routePath === "public/products/latest") {
       const products = await Product.find({ isActive: true })
         .sort({ createdAt: -1 })
         .limit(6)
@@ -1100,54 +1128,53 @@ export async function GET(request, { params }) {
       }));
       return Response.json({ categories: categoriesArray });
     }
-
+  
     // ----- ORDERS -----
 
     if (routePath === "orders/list") {
-      const limit = parseInt(searchParams.get("limit") || "50");
-      const page = parseInt(searchParams.get("page") || "1");
-      const status = searchParams.get("status");
+  const limit = parseInt(searchParams.get("limit") || "50");
+  const page = parseInt(searchParams.get("page") || "1");
+  const status = searchParams.get("status");
 
-      const query = {};
-      if (status) query.status = status;
+  const query = {};
+  if (status) query.status = status;
 
-      const orders = await Orders.find(query)
-        .sort({ createdAt: -1 })
-        .limit(limit)
-        .skip((page - 1) * limit)
-        .lean();
+  const orders = await Orders.find(query)
+    .sort({ createdAt: -1 })
+    .limit(limit)
+    .skip((page - 1) * limit)
+    .lean();
 
-      // Transform orders to match expected format
-      const transformedOrders = orders.map((order) => ({
-        id: order._id.toString(),
-        orderNumber: order._id.toString().slice(-8),
-        items: order.items,
-        totalAmount: order.totalAmount,
-        deliveryAddress: order.deliveryAddress,
-        status: order.status,
-        createdAt: order.createdAt,
-        fulfilledAt: order.updatedAt,
-      }));
+  const transformedOrders = orders.map((order) => ({
+    id: order._id.toString(),
+    orderNumber: order._id.toString().slice(-8),
+    items: order.items,
+    totalAmount: order.totalAmount,
+    deliveryAddress: order.deliveryAddress,
+    status: order.status, // pending | paid | packing | shipping | delivered
+    createdAt: order.createdAt,
+    updatedAt: order.updatedAt,
+  }));
 
-      const total = await Orders.countDocuments(query);
+  const total = await Orders.countDocuments(query);
 
-      return Response.json({ orders: transformedOrders, total, page, limit });
+  return Response.json({
+    orders: transformedOrders,
+    total,
+    page,
+    limit,
+  });
     }
-
-    return Response.json({ error: "Route not found" }, { status: 404 });
-  } catch (error) {
-    console.error("IMS API Error:", error);
-    return Response.json(
-      {
-        error: error.message || "Internal server error",
-        details:
-          process.env.NODE_ENV === "development" ? error.stack : undefined,
-      },
-      { status: 500 },
-    );
-  }
+  }catch (error) {
+        console.error("IMS get Error:", error);
+        return Response.json(
+          {
+            error: error.message || "Internal server error",
+          },
+          { status: 500 },
+        );
+    }
 }
-
 // Add missing DELETE handler
 export async function DELETE(request, { params }) {
   try {

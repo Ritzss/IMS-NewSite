@@ -93,6 +93,14 @@ export default function VastraDrobeIMS() {
   const [showProductDialog, setShowProductDialog] = useState(false);
   const [isEditingProduct, setIsEditingProduct] = useState(false);
 
+  const STATUS_COLORS = {
+    pending: "secondary",
+    paid: "default",
+    packing: "warning",
+    shipping: "outline",
+    delivered: "success",
+  };
+
   // Variants state
   // const [variants, setVariants] = useState([]);
   // const [variantForm, setVariantForm] = useState({
@@ -501,6 +509,47 @@ export default function VastraDrobeIMS() {
   //   }
   // };
 
+
+const updateOrderStatus = async (orderId, newStatus) => {
+  try {
+    const token = localStorage.getItem("token");
+
+    if (!token) {
+      toast.error("Session expired. Please login again.");
+      return;
+    }
+
+    const res = await fetch("/api/ims/orders/update-status", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ orderId, newStatus }),
+    });
+
+    // 👇 handle NON-JSON responses safely
+    const text = await res.text();
+    let data;
+    try {
+      data = JSON.parse(text);
+    } catch {
+      throw new Error(text || "Server error");
+    }
+
+    if (!res.ok) {
+      throw new Error(data.error || "Failed to update order");
+    }
+
+    toast.success(`Order moved to ${newStatus}`);
+    loadOrders();
+  } catch (err) {
+    console.error(err);
+    toast.error(err.message || "Something went wrong");
+  }
+};
+
+
   // const editVariant = (variant) => {
   //   setVariantForm({
   //     id: variant.id,
@@ -601,18 +650,6 @@ export default function VastraDrobeIMS() {
       });
 
       loadStockMovements();
-      loadInventory();
-      loadDashboardStats();
-    } catch (error) {
-      toast.error(error.message);
-    }
-  };
-
-  const fulfillOrder = async (orderId) => {
-    try {
-      await apiCall("/orders/fulfill", "POST", { orderId });
-      toast.success("Order fulfilled successfully");
-      loadOrders();
       loadInventory();
       loadDashboardStats();
     } catch (error) {
@@ -1852,65 +1889,95 @@ export default function VastraDrobeIMS() {
               <Search className="w-4 h-4 mr-2" />
               Refresh
             </Button>
+
             <Card>
               <CardHeader>
                 <CardTitle>Orders</CardTitle>
-                <CardDescription>Manage order fulfillment</CardDescription>
+                <CardDescription>
+                  Manage order fulfillment lifecycle
+                </CardDescription>
               </CardHeader>
+
               <CardContent>
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Order Number</TableHead>
-                      <TableHead>Total Amount</TableHead>
-                      <TableHead>Items Details</TableHead>
+                      <TableHead>Order No.</TableHead>
+                      <TableHead>Total</TableHead>
+                      <TableHead>Items</TableHead>
                       <TableHead>Delivery Address</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Created</TableHead>
                       <TableHead>Actions</TableHead>
                     </TableRow>
                   </TableHeader>
+
                   <TableBody>
                     {orders.map((order) => (
                       <TableRow key={order.id}>
                         <TableCell className="font-medium">
-                          {order.orderNumber}
+                          #{order.orderNumber}
                         </TableCell>
+
                         <TableCell>₹{order.totalAmount}</TableCell>
-                        <TableCell>
-                          Products{" : "}
-                          {order?.items?.length
+
+                        <TableCell className="text-sm">
+                          {order.items?.length
                             ? order.items
                                 .map((p) => `ID ${p.productId} (Qty: ${p.qty})`)
                                 .join(", ")
-                            : 0}
+                            : "—"}
                         </TableCell>
-                        <TableCell>
-                          {order?.deliveryAddress
+
+                        <TableCell className="text-sm">
+                          {order.deliveryAddress
                             ? `${order.deliveryAddress.address} (${order.deliveryAddress.phone})`
                             : "—"}
                         </TableCell>
+
                         <TableCell>
                           <Badge
-                            variant={
-                              order.status === "fulfilled"
-                                ? "default"
-                                : "secondary"
-                            }
+                            variant={STATUS_COLORS[order.status] || "secondary"}
                           >
                             {order.status}
                           </Badge>
                         </TableCell>
+
                         <TableCell>
                           {new Date(order.createdAt).toLocaleString()}
                         </TableCell>
-                        <TableCell>
-                          {order.status === "pending" && (
+
+                        <TableCell className="space-x-2">
+                          {order.status === "paid" && (
                             <Button
                               size="sm"
-                              onClick={() => fulfillOrder(order.id)}
+                              onClick={() =>
+                                updateOrderStatus(order.id, "packing")
+                              }
                             >
-                              Fulfill
+                              Mark Packing
+                            </Button>
+                          )}
+
+                          {order.status === "packing" && (
+                            <Button
+                              size="sm"
+                              onClick={() =>
+                                updateOrderStatus(order.id, "shipping")
+                              }
+                            >
+                              Mark Shipped
+                            </Button>
+                          )}
+
+                          {order.status === "shipping" && (
+                            <Button
+                              size="sm"
+                              onClick={() =>
+                                updateOrderStatus(order.id, "delivered")
+                              }
+                            >
+                              Mark Delivered
                             </Button>
                           )}
                         </TableCell>
