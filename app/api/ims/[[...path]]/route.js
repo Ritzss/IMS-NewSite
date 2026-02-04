@@ -831,7 +831,7 @@ export async function GET(request, { params }) {
           productId: { $in: ids },
           isActive: true,
         })
-          .select("productId name price mrp images category subcategory stock")
+          .select("productId name description price mrp images category subcategory stock")
           .lean();
 
         return Response.json({ products });
@@ -849,7 +849,7 @@ export async function GET(request, { params }) {
 
       const products = await Product.find(filter)
         .select(
-          "productId name price mrp images category subcategory sizes stock",
+          "productId name description price mrp images category subcategory sizes stock",
         )
         .sort({ createdAt: -1 })
         .skip(skip)

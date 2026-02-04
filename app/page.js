@@ -86,8 +86,8 @@ export default function VastraDrobeIMS() {
     brand: "",
     price: 0,
     mrp: 0,
-    sizes: "",
-    color: "",
+    sizes: [],
+    color: [],
     images: [],
   });
   const [showProductDialog, setShowProductDialog] = useState(false);
@@ -403,8 +403,8 @@ export default function VastraDrobeIMS() {
         brand: "",
         price: 0,
         mrp: 0,
-        sizes: "",
-        color: "",
+        sizes: [],
+        color: [],
         images: [],
         isActive: true,
       });
@@ -428,7 +428,10 @@ export default function VastraDrobeIMS() {
         brand: productForm.brand,
         price: productForm.price,
         mrp: productForm.mrp,
-        sizes: productForm.sizes,
+        sizes: productForm.sizes
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean),
         color: productForm.color
           .split(",")
           .map((s) => s.trim())
@@ -451,8 +454,8 @@ export default function VastraDrobeIMS() {
         brand: "",
         price: 0,
         mrp: 0,
-        sizes: "",
-        color: "",
+        sizes: [],
+        color: [],
         images: [],
         isActive: true,
       });
