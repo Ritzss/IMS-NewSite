@@ -168,35 +168,33 @@ export async function POST(request, { params }) {
         .split(",")
         .map((s) => s.trim())
         .filter(Boolean);
+
       const color = (formData.get("color") || "")
         .split(",")
-        .map((c) => c.trim())
+        .map((c) => c.trim().toLowerCase())
         .filter(Boolean);
 
-      const imageFiles = formData.getAll("images"); // File[]
-
-      if (!name || !price) {
+      if (!name || !price || !color.length) {
         return Response.json(
-          { error: "Name & price required" },
+          { error: "Name, price and at least one color are required" },
           { status: 400 },
         );
       }
 
+      const imageFiles = formData.getAll("images");
       const imagePaths = [];
 
       for (const file of imageFiles) {
         if (!file || typeof file === "string") continue;
 
-        const bytes = await file.arrayBuffer();
-        const buffer = Buffer.from(bytes);
-
+        const buffer = Buffer.from(await file.arrayBuffer());
         const base64 = `data:${file.type};base64,${buffer.toString("base64")}`;
 
-        const uploadRes = await cloudinary.uploader.upload(base64, {
+        const upload = await cloudinary.uploader.upload(base64, {
           folder: "products",
         });
 
-        imagePaths.push(uploadRes.secure_url); // ✅ PUBLIC URL
+        imagePaths.push(upload.secure_url);
       }
 
       const lastProduct = await Product.findOne().sort({ productId: -1 });
@@ -212,28 +210,62 @@ export async function POST(request, { params }) {
         price,
         mrp: mrp || price,
         sizes,
-        color,
-        images: imagePaths, // ✅ NOW STORES
+        color, // ✅ ALWAYS ARRAY
+        images: imagePaths,
         stock: 0,
         isActive: true,
       });
 
       return Response.json({
         message: "Product created successfully",
-        productId: product.productId,
-        images: imagePaths,
+        product,
       });
     }
 
     if (routePath === "products/update") {
-      const body = await request.json();
-
       checkRole(user, ["admin"]);
-      const { productId, ...updates } = body;
 
-      const oldProduct = await Product.findOne({ productId }).lean();
-      if (!oldProduct) {
-        return Response.json({ error: "Product not found" }, { status: 404 });
+      const {
+        productId,
+        name,
+        description,
+        category,
+        subcategory,
+        brand,
+        price,
+        mrp,
+        sizes,
+        color,
+      } = await request.json();
+
+      const updates = {
+        name,
+        description,
+        category,
+        subcategory, // ✅ CONSISTENT
+        brand,
+        price,
+        mrp,
+        sizes: Array.isArray(sizes)
+          ? sizes
+          : String(sizes || "")
+              .split(",")
+              .map((s) => s.trim())
+              .filter(Boolean),
+
+        color: Array.isArray(color)
+          ? color
+          : String(color || "")
+              .split(",")
+              .map((c) => c.trim().toLowerCase())
+              .filter(Boolean),
+      };
+
+      if (!updates.color.length) {
+        return Response.json(
+          { error: "At least one color is required" },
+          { status: 400 },
+        );
       }
 
       const product = await Product.findOneAndUpdate(
@@ -242,15 +274,9 @@ export async function POST(request, { params }) {
         { new: true },
       );
 
-      await logActivity(
-        user.id,
-        "update",
-        "product",
-        productId.toString(),
-        oldProduct,
-        updates,
-        request.headers.get("x-forwarded-for"),
-      );
+      if (!product) {
+        return Response.json({ error: "Product not found" }, { status: 404 });
+      }
 
       return Response.json({
         message: "Product updated successfully",
@@ -618,111 +644,110 @@ export async function POST(request, { params }) {
     }
 
     // ----- ORDERS -----
-// POST /api/ims/orders/update-status
-if (routePath === "orders/update-status") {
-  checkRole(user, ["admin", "inventory_manager"]);
+    // POST /api/ims/orders/update-status
+    if (routePath === "orders/update-status") {
+      checkRole(user, ["admin", "inventory_manager"]);
 
-  const { orderId, newStatus } = await request.json();
+      const { orderId, newStatus } = await request.json();
 
-  if (!orderId || !newStatus) {
-    return Response.json(
-      { error: "Order ID and new status are required" },
-      { status: 400 }
-    );
-  }
-
-  const STATUS_FLOW = [
-    "pending",
-    "paid",
-    "packing",
-    "shipping",
-    "delivered",
-  ];
-
-  if (!STATUS_FLOW.includes(newStatus)) {
-    return Response.json(
-      { error: "Invalid order status" },
-      { status: 400 }
-    );
-  }
-
-  const order = await Orders.findById(orderId);
-  if (!order) {
-    return Response.json({ error: "Order not found" }, { status: 404 });
-  }
-
-  const currentIndex = STATUS_FLOW.indexOf(order.status);
-  const nextIndex = STATUS_FLOW.indexOf(newStatus);
-
-  if (nextIndex <= currentIndex) {
-    return Response.json(
-      { error: "Invalid status transition" },
-      { status: 400 }
-    );
-  }
-
-  // 🔻 Deduct inventory ONLY when moving to PACKING
-  if (newStatus === "packing") {
-    await runTransaction(async (session) => {
-      for (const item of order.items) {
-        const productId = Number(item.productId);
-        const quantity = Number(item.qty || item.quantity || 1);
-        const size = item.size || "FREE";
-
-        const warehouse =
-          item.warehouseId ||
-          (await IMSWarehouse.findOne().session(session))?._id;
-
-        if (!warehouse) {
-          throw new Error("No warehouse available");
-        }
-
-        await IMSInventory.findOneAndUpdate(
-          { productId, warehouseId: warehouse, size },
-          {
-            $inc: { quantity: -quantity },
-            $set: { updatedBy: user.id, lastUpdated: new Date() },
-          },
-          { session }
-        );
-
-        await IMSStockMovement.create(
-          [
-            {
-              productId,
-              size,
-              quantity,
-              type: "sale",
-              fromWarehouseId: warehouse,
-              performedBy: user.id,
-              referenceNumber: order._id.toString(),
-            },
-          ],
-          { session }
+      if (!orderId || !newStatus) {
+        return Response.json(
+          { error: "Order ID and new status are required" },
+          { status: 400 },
         );
       }
-    });
-  }
 
-  order.status = newStatus;
-  await order.save();
+      const STATUS_FLOW = [
+        "pending",
+        "paid",
+        "packing",
+        "shipping",
+        "delivered",
+      ];
 
-  await logActivity(
-    user.id,
-    "update_status",
-    "order",
-    orderId,
-    null,
-    { status: newStatus },
-    request.headers.get("x-forwarded-for")
-  );
+      if (!STATUS_FLOW.includes(newStatus)) {
+        return Response.json(
+          { error: "Invalid order status" },
+          { status: 400 },
+        );
+      }
 
-  return Response.json({
-    message: "Order status updated",
-    status: order.status,
-  });
-}
+      const order = await Orders.findById(orderId);
+      if (!order) {
+        return Response.json({ error: "Order not found" }, { status: 404 });
+      }
 
+      const currentIndex = STATUS_FLOW.indexOf(order.status);
+      const nextIndex = STATUS_FLOW.indexOf(newStatus);
+
+      if (nextIndex <= currentIndex) {
+        return Response.json(
+          { error: "Invalid status transition" },
+          { status: 400 },
+        );
+      }
+
+      // 🔻 Deduct inventory ONLY when moving to PACKING
+      if (newStatus === "packing") {
+        await runTransaction(async (session) => {
+          for (const item of order.items) {
+            const productId = Number(item.productId);
+            const quantity = Number(item.qty || item.quantity || 1);
+            const size = item.size || "FREE";
+
+            const warehouse =
+              item.warehouseId ||
+              (await IMSWarehouse.findOne().session(session))?._id;
+
+            if (!warehouse) {
+              throw new Error("No warehouse available");
+            }
+
+            await IMSInventory.findOneAndUpdate(
+              { productId, warehouseId: warehouse, size },
+              {
+                $inc: { quantity: -quantity },
+                $set: { updatedBy: user.id, lastUpdated: new Date() },
+              },
+              { session },
+            );
+
+            await IMSStockMovement.create(
+              [
+                {
+                  productId,
+                  size,
+                  quantity,
+                  type: "sale",
+                  fromWarehouseId: warehouse,
+                  performedBy: user.id,
+                  referenceNumber: order._id.toString(),
+                },
+              ],
+              { session },
+            );
+          }
+        });
+      }
+
+      order.status = newStatus;
+      await order.save();
+
+      await logActivity(
+        user.id,
+        "update_status",
+        "order",
+        orderId,
+        null,
+        { status: newStatus },
+        request.headers.get("x-forwarded-for"),
+      );
+
+      return Response.json({
+        message: "Order status updated",
+        status: order.status,
+      });
+    }
 
     // ----- ADMIN USERS -----
 
@@ -831,7 +856,9 @@ export async function GET(request, { params }) {
           productId: { $in: ids },
           isActive: true,
         })
-          .select("productId name description price mrp images category subcategory stock")
+          .select(
+            "productId name description price mrp color images category subcategory stock",
+          )
           .lean();
 
         return Response.json({ products });
@@ -849,7 +876,7 @@ export async function GET(request, { params }) {
 
       const products = await Product.find(filter)
         .select(
-          "productId name description price mrp images category subcategory sizes stock",
+          "productId name description price mrp color images category subcategory sizes stock",
         )
         .sort({ createdAt: -1 })
         .skip(skip)
@@ -1128,52 +1155,52 @@ export async function GET(request, { params }) {
       }));
       return Response.json({ categories: categoriesArray });
     }
-  
+
     // ----- ORDERS -----
 
     if (routePath === "orders/list") {
-  const limit = parseInt(searchParams.get("limit") || "50");
-  const page = parseInt(searchParams.get("page") || "1");
-  const status = searchParams.get("status");
+      const limit = parseInt(searchParams.get("limit") || "50");
+      const page = parseInt(searchParams.get("page") || "1");
+      const status = searchParams.get("status");
 
-  const query = {};
-  if (status) query.status = status;
+      const query = {};
+      if (status) query.status = status;
 
-  const orders = await Orders.find(query)
-    .sort({ createdAt: -1 })
-    .limit(limit)
-    .skip((page - 1) * limit)
-    .lean();
+      const orders = await Orders.find(query)
+        .sort({ createdAt: -1 })
+        .limit(limit)
+        .skip((page - 1) * limit)
+        .lean();
 
-  const transformedOrders = orders.map((order) => ({
-    id: order._id.toString(),
-    orderNumber: order._id.toString().slice(-8),
-    items: order.items,
-    totalAmount: order.totalAmount,
-    deliveryAddress: order.deliveryAddress,
-    status: order.status, // pending | paid | packing | shipping | delivered
-    createdAt: order.createdAt,
-    updatedAt: order.updatedAt,
-  }));
+      const transformedOrders = orders.map((order) => ({
+        id: order._id.toString(),
+        orderNumber: order._id.toString().slice(-8),
+        items: order.items,
+        totalAmount: order.totalAmount,
+        deliveryAddress: order.deliveryAddress,
+        status: order.status, // pending | paid | packing | shipping | delivered
+        createdAt: order.createdAt,
+        updatedAt: order.updatedAt,
+      }));
 
-  const total = await Orders.countDocuments(query);
+      const total = await Orders.countDocuments(query);
 
-  return Response.json({
-    orders: transformedOrders,
-    total,
-    page,
-    limit,
-  });
+      return Response.json({
+        orders: transformedOrders,
+        total,
+        page,
+        limit,
+      });
     }
-  }catch (error) {
-        console.error("IMS get Error:", error);
-        return Response.json(
-          {
-            error: error.message || "Internal server error",
-          },
-          { status: 500 },
-        );
-    }
+  } catch (error) {
+    console.error("IMS get Error:", error);
+    return Response.json(
+      {
+        error: error.message || "Internal server error",
+      },
+      { status: 500 },
+    );
+  }
 }
 // Add missing DELETE handler
 export async function DELETE(request, { params }) {
