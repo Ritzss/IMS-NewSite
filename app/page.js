@@ -512,46 +512,44 @@ export default function VastraDrobeIMS() {
   //   }
   // };
 
-
-const updateOrderStatus = async (orderId, newStatus) => {
-  try {
-    const token = localStorage.getItem("token");
-
-    if (!token) {
-      toast.error("Session expired. Please login again.");
-      return;
-    }
-
-    const res = await fetch("/api/ims/orders/update-status", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({ orderId, newStatus }),
-    });
-
-    // 👇 handle NON-JSON responses safely
-    const text = await res.text();
-    let data;
+  const updateOrderStatus = async (orderId, newStatus) => {
     try {
-      data = JSON.parse(text);
-    } catch {
-      throw new Error(text || "Server error");
+      const token = localStorage.getItem("token");
+
+      if (!token) {
+        toast.error("Session expired. Please login again.");
+        return;
+      }
+
+      const res = await fetch("/api/ims/orders/update-status", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ orderId, newStatus }),
+      });
+
+      // 👇 handle NON-JSON responses safely
+      const text = await res.text();
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch {
+        throw new Error(text || "Server error");
+      }
+
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to update order");
+      }
+
+      toast.success(`Order moved to ${newStatus}`);
+      loadOrders();
+    } catch (err) {
+      console.error(err);
+      toast.error(err.message || "Something went wrong");
     }
-
-    if (!res.ok) {
-      throw new Error(data.error || "Failed to update order");
-    }
-
-    toast.success(`Order moved to ${newStatus}`);
-    loadOrders();
-  } catch (err) {
-    console.error(err);
-    toast.error(err.message || "Something went wrong");
-  }
-};
-
+  };
 
   // const editVariant = (variant) => {
   //   setVariantForm({
@@ -1377,13 +1375,15 @@ const updateOrderStatus = async (orderId, newStatus) => {
                         <Input
                           type="number"
                           placeholder="Enter product ID"
+                          min={0}
                           value={addInventoryForm.productId}
-                          onChange={(e) =>
+                          onChange={(e) => {
+                            const value = Math.max(0, Number(e.target.value));
                             setAddInventoryForm({
                               ...addInventoryForm,
-                              productId: e.target.value,
-                            })
-                          }
+                              productId: value,
+                            });
+                          }}
                           required
                         />
                       </div>
