@@ -59,7 +59,8 @@ export async function POST(request, { params }) {
   try {
     await connectDB();
 
-    const routePath = params?.path?.join("/") || "";
+    const resolveParam = await params;
+    const routePath = resolveParam?.path?.join("/") || "";
     const authHeader = request.headers.get("authorization");
 
     console.log("IMS POST path:", routePath); // Debug
@@ -839,7 +840,8 @@ export async function POST(request, { params }) {
 export async function GET(request, { params }) {
   try {
     await connectDB();
-    const rawPath = params?.path?.join("/") || "";
+    const resolveParam = await params;
+    const rawPath = resolveParam?.path?.join("/") || "";
     const routePath = rawPath.replace(/^ims\//, "");
     const authHeader = request.headers.get("authorization");
     const url = new URL(request.url);
@@ -868,7 +870,7 @@ export async function GET(request, { params }) {
           isActive: true,
         })
           .select(
-            "productId name description price mrp color images category subcategory stock",
+            "productId name stock description price mrp color images brand category subcategory sizes stock",
           )
           .lean();
 
@@ -887,7 +889,7 @@ export async function GET(request, { params }) {
 
       const products = await Product.find(filter)
         .select(
-          "productId name description price mrp color images category subcategory sizes stock",
+          "productId name stock description price mrp color images brand category subcategory sizes stock",
         )
         .sort({ createdAt: -1 })
         .skip(skip)
@@ -1217,8 +1219,9 @@ export async function GET(request, { params }) {
 export async function DELETE(request, { params }) {
   try {
     await connectDB();
+    const resolveParam = await params;
 
-    const routePath = params?.path?.join("/") || "";
+    const routePath = resolveParam?.path?.join("/") || "";
     const authHeader = request.headers.get("authorization");
     const user = verifyToken(authHeader);
 

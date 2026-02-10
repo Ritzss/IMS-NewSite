@@ -1034,9 +1034,9 @@ export default function VastraDrobeIMS() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-2">
-                  {dashboardStats?.recentMovements?.map((movement) => (
+                  {dashboardStats?.recentMovements?.map((movement,ind) => (
                     <div
-                      key={movement.id}
+                      key={`${movement.id}-${ind}`}
                       className="flex items-center justify-between border-b pb-2"
                     >
                       <div>
@@ -1291,9 +1291,9 @@ export default function VastraDrobeIMS() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {products.map((product) => {
+                    {products.map((product,ind) => {
                       return (
-                        <TableRow key={product.id}>
+                        <TableRow key={`${product.id}-${ind}`}>
                           <TableCell>{product.productId}</TableCell>
                           <TableCell className="font-medium">
                             {product.name}
@@ -1865,8 +1865,8 @@ export default function VastraDrobeIMS() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {stockMovements.map((movement) => (
-                      <TableRow key={movement.id}>
+                    {stockMovements.map((movement,ind) => (
+                      <TableRow key={`${movement.id}-${ind}`}>
                         <TableCell>
                           {new Date(movement.createdAt).toLocaleString()}
                         </TableCell>
@@ -2139,8 +2139,8 @@ export default function VastraDrobeIMS() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {warehouses.map((warehouse) => (
-                      <TableRow key={warehouse.id}>
+                    {warehouses.map((warehouse,ind) => (
+                      <TableRow key={`${warehouse.id}-${ind}`}>
                         <TableCell className="font-medium">
                           {warehouse.name}
                         </TableCell>
