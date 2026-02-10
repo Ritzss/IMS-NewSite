@@ -464,11 +464,22 @@ export async function POST(request, { params }) {
         referenceNumber,
       } = body;
 
+      if (!Number.isInteger(productId) || productId < 0) {
+        return Response.json({ error: "Invalid product ID" }, { status: 400 });
+      }
+
+      if (!warehouseId || !size || quantity < 0) {
+        return Response.json(
+          { error: "Invalid inventory data" },
+          { status: 400 },
+        );
+      }
+
       const inventory = await addStock(
-        parseInt(productId),
+        productId,
         warehouseId,
         size,
-        parseInt(quantity),
+        quantity,
         user.id,
         reason,
         referenceNumber,

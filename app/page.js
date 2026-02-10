@@ -202,42 +202,43 @@ export default function VastraDrobeIMS() {
   // Search
   const [searchTerm, setSearchTerm] = useState("");
 
-  // API helper
   const apiCall = async (endpoint, method = "GET", body) => {
-    const headers = {
-      "Content-Type": "application/json",
-    };
+  const token =
+    typeof window !== "undefined"
+      ? localStorage.getItem("token")
+      : null;
 
-    if (token) {
-      headers["Authorization"] = `Bearer ${token}`;
-    }
-
-    const options = {
-      method,
-      headers,
-    };
-
-    if (body) {
-      options.body = JSON.stringify(body);
-    }
-
-    const response = await fetch(`${API_BASE}${endpoint}`, options);
-
-    if (response.status === 401) {
-      localStorage.removeItem("token");
-      localStorage.removeItem("user");
-      window.location.href = "/";
-      return;
-    }
-
-    const data = await response.json();
-
-    if (!response.ok) {
-      throw new Error(data.error || "API request failed");
-    }
-
-    return data;
+  const headers = {
+    "Content-Type": "application/json",
   };
+
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+
+  const options = {
+    method,
+    headers,
+    ...(body && { body: JSON.stringify(body) }),
+  };
+
+  const response = await fetch(`${API_BASE}${endpoint}`, options);
+
+  if (response.status === 401) {
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+    window.location.href = "/";
+    return;
+  }
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.error || "API request failed");
+  }
+
+  return data;
+};
 
   // Auth functions
   const handleLogin = async (e) => {
@@ -770,6 +771,15 @@ export default function VastraDrobeIMS() {
       toast.error(error.message);
     }
   };
+
+  useEffect(() => {
+    const loadProducts = async () => {
+      const data = await apiCall("/products/list");
+      setProducts(data.products);
+    };
+
+    loadProducts();
+  }, []);
 
   // Check for existing token on mount
   useEffect(() => {
@@ -1372,21 +1382,28 @@ export default function VastraDrobeIMS() {
                     <form onSubmit={addInventory} className="space-y-4">
                       <div>
                         <Label>Product ID</Label>
-                        <Input
-                          type="number"
-                          placeholder="Enter product ID"
-                          min={0}
+                        <Select
                           value={addInventoryForm.productId}
-                          onChange={(e) => {
-                            const value = Math.max(0, Number(e.target.value));
+                          onValueChange={(val) =>
                             setAddInventoryForm({
                               ...addInventoryForm,
-                              productId: value,
-                            });
-                          }}
-                          required
-                        />
+                              productId: parseInt(val),
+                            })
+                          }
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select product" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {products.map((p) => (
+                              <SelectItem key={p.productId} value={String(p.productId)}>
+                                {p.name} (ID: {p.productId})
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </div>
+
                       <div>
                         <Label>Warehouse</Label>
                         <Select
