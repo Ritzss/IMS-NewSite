@@ -223,11 +223,55 @@ export async function POST(request, { params }) {
       });
     }
 
-    if (routePath === "products/update") {
-      checkRole(user, ["admin"]);
+if (routePath === "products/update") {
+  checkRole(user, ["admin"]);
 
-      const {
-        productId,
+  const formData = await request.formData();
+
+  const productId = formData.get("productId");
+  const name = formData.get("name");
+  const description = formData.get("description");
+  const category = formData.get("category");
+  const subcategory = formData.get("subcategory");
+  const brand = formData.get("brand");
+  const price = Number(formData.get("price"));
+  const mrp = Number(formData.get("mrp"));
+
+  const sizes = JSON.parse(formData.get("sizes") || "[]");
+  const color = JSON.parse(formData.get("color") || "[]");
+  const existingImages = JSON.parse(
+    formData.get("existingImages") || "[]"
+  );
+
+  const imageFiles = formData.getAll("images");
+
+  let uploadedImages = [];
+
+  for (const file of imageFiles) {
+    if (file && file.size > 0) {
+      const buffer = Buffer.from(await file.arrayBuffer());
+
+      const uploadResult = await new Promise((resolve, reject) => {
+        const stream = cloudinary.uploader.upload_stream(
+          { folder: "products" },
+          (error, result) => {
+            if (error) reject(error);
+            else resolve(result);
+          }
+        );
+        stream.end(buffer);
+      });
+
+      uploadedImages.push(uploadResult.secure_url);
+    }
+  }
+
+  const finalImages = [...existingImages, ...uploadedImages];
+
+  const product = await Product.findOneAndUpdate(
+    { productId },
+    {
+      $set: {
         name,
         description,
         category,
@@ -237,53 +281,23 @@ export async function POST(request, { params }) {
         mrp,
         sizes,
         color,
-      } = await request.json();
+        images: finalImages,
+      },
+    },
+    { new: true }
+  );
 
-      const updates = {
-        name,
-        description,
-        category,
-        subcategory, // ✅ CONSISTENT
-        brand,
-        price,
-        mrp,
-        sizes: Array.isArray(sizes)
-          ? sizes
-          : String(sizes || "")
-              .split(",")
-              .map((s) => s.trim())
-              .filter(Boolean),
+  if (!product) {
+    return Response.json({ error: "Product not found" }, { status: 404 });
+  }
 
-        color: Array.isArray(color)
-          ? color
-          : String(color || "")
-              .split(",")
-              .map((c) => c.trim().toLowerCase())
-              .filter(Boolean),
-      };
+  return Response.json({
+    message: "Product updated successfully",
+    product,
+  });
+}
 
-      if (!updates.color.length) {
-        return Response.json(
-          { error: "At least one color is required" },
-          { status: 400 },
-        );
-      }
 
-      const product = await Product.findOneAndUpdate(
-        { productId },
-        { $set: updates },
-        { new: true },
-      );
-
-      if (!product) {
-        return Response.json({ error: "Product not found" }, { status: 404 });
-      }
-
-      return Response.json({
-        message: "Product updated successfully",
-        product,
-      });
-    }
 
     // ----- WAREHOUSES -----
 

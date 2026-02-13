@@ -203,42 +203,40 @@ export default function VastraDrobeIMS() {
   const [searchTerm, setSearchTerm] = useState("");
 
   const apiCall = async (endpoint, method = "GET", body) => {
-  const token =
-    typeof window !== "undefined"
-      ? localStorage.getItem("token")
-      : null;
+    const token =
+      typeof window !== "undefined" ? localStorage.getItem("token") : null;
 
-  const headers = {
-    "Content-Type": "application/json",
+    const headers = {
+      "Content-Type": "application/json",
+    };
+
+    if (token) {
+      headers.Authorization = `Bearer ${token}`;
+    }
+
+    const options = {
+      method,
+      headers,
+      ...(body && { body: JSON.stringify(body) }),
+    };
+
+    const response = await fetch(`${API_BASE}${endpoint}`, options);
+
+    if (response.status === 401) {
+      localStorage.removeItem("token");
+      localStorage.removeItem("user");
+      window.location.href = "/";
+      return;
+    }
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || "API request failed");
+    }
+
+    return data;
   };
-
-  if (token) {
-    headers.Authorization = `Bearer ${token}`;
-  }
-
-  const options = {
-    method,
-    headers,
-    ...(body && { body: JSON.stringify(body) }),
-  };
-
-  const response = await fetch(`${API_BASE}${endpoint}`, options);
-
-  if (response.status === 401) {
-    localStorage.removeItem("token");
-    localStorage.removeItem("user");
-    window.location.href = "/";
-    return;
-  }
-
-  const data = await response.json();
-
-  if (!response.ok) {
-    throw new Error(data.error || "API request failed");
-  }
-
-  return data;
-};
 
   // Auth functions
   const handleLogin = async (e) => {
@@ -416,56 +414,62 @@ export default function VastraDrobeIMS() {
     }
   };
 
-  const updateProduct = async (e) => {
-    e.preventDefault();
+ const updateProduct = async (e) => {
+  e.preventDefault();
 
-    try {
-      const payload = {
-        productId: productForm.productId,
-        name: productForm.name,
-        description: productForm.description,
-        category: productForm.category,
-        subCategory: productForm.subCategory,
-        brand: productForm.brand,
-        price: productForm.price,
-        mrp: productForm.mrp,
-        sizes: productForm.sizes
-          .split(",")
-          .map((s) => s.trim())
-          .filter(Boolean),
-        color: productForm.color
-          .split(",")
-          .map((s) => s.trim())
-          .filter(Boolean),
-      };
+  try {
+    const formData = new FormData();
 
-      await apiCall("/products/update", "POST", payload);
+    formData.append("productId", productForm.productId);
+    formData.append("name", productForm.name);
+    formData.append("description", productForm.description);
+    formData.append("category", productForm.category);
+    formData.append("subcategory", productForm.subcategory);
+    formData.append("brand", productForm.brand);
+    formData.append("price", productForm.price);
+    formData.append("mrp", productForm.mrp);
 
-      toast.success("Product updated successfully");
+    formData.append("sizes", JSON.stringify(productForm.sizes || []));
+    formData.append("color", JSON.stringify(productForm.color || []));
 
-      setShowProductDialog(false);
-      setIsEditingProduct(false);
+    // send existing image URLs
+    formData.append(
+      "existingImages",
+      JSON.stringify(productForm.existingImages || [])
+    );
 
-      setProductForm({
-        productId: "",
-        name: "",
-        description: "",
-        category: "",
-        subCategory: "",
-        brand: "",
-        price: 0,
-        mrp: 0,
-        sizes: [],
-        color: [],
-        images: [],
-        isActive: true,
+    // send new images only
+    if (productForm.images && productForm.images.length > 0) {
+      productForm.images.forEach((file) => {
+        if (file instanceof File) {
+          formData.append("images", file);
+        }
       });
-
-      loadProducts();
-    } catch (err) {
-      toast.error(err.message);
     }
-  };
+
+    const res = await fetch("/api/ims/products/update", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+      body: formData,
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) throw new Error(data.error || "Failed");
+
+    toast.success("Product updated successfully");
+
+    setShowProductDialog(false);
+    setIsEditingProduct(false);
+
+    loadProducts();
+  } catch (err) {
+    toast.error(err.message);
+  }
+};
+
 
   const editProduct = (product) => {
     setProductForm({
@@ -1034,7 +1038,7 @@ export default function VastraDrobeIMS() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-2">
-                  {dashboardStats?.recentMovements?.map((movement,ind) => (
+                  {dashboardStats?.recentMovements?.map((movement, ind) => (
                     <div
                       key={`${movement.id}-${ind}`}
                       className="flex items-center justify-between border-b pb-2"
@@ -1153,7 +1157,7 @@ export default function VastraDrobeIMS() {
                             <Label>Sub Category</Label>
                             <Input
                               placeholder="e.g., Boys Clothing, Women Accessories"
-                              value={productForm.subcategory}
+                              value={productForm?.subcategory ?? ""}
                               onChange={(e) =>
                                 setProductForm({
                                   ...productForm,
@@ -1291,7 +1295,7 @@ export default function VastraDrobeIMS() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {products.map((product,ind) => {
+                    {products.map((product, ind) => {
                       return (
                         <TableRow key={`${product.id}-${ind}`}>
                           <TableCell>{product.productId}</TableCell>
@@ -1396,7 +1400,10 @@ export default function VastraDrobeIMS() {
                           </SelectTrigger>
                           <SelectContent>
                             {products.map((p) => (
-                              <SelectItem key={p.productId} value={String(p.productId)}>
+                              <SelectItem
+                                key={p.productId}
+                                value={String(p.productId)}
+                              >
                                 {p.name} (ID: {p.productId})
                               </SelectItem>
                             ))}
@@ -1865,7 +1872,7 @@ export default function VastraDrobeIMS() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {stockMovements.map((movement,ind) => (
+                    {stockMovements.map((movement, ind) => (
                       <TableRow key={`${movement.id}-${ind}`}>
                         <TableCell>
                           {new Date(movement.createdAt).toLocaleString()}
@@ -2139,7 +2146,7 @@ export default function VastraDrobeIMS() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {warehouses.map((warehouse,ind) => (
+                    {warehouses.map((warehouse, ind) => (
                       <TableRow key={`${warehouse.id}-${ind}`}>
                         <TableCell className="font-medium">
                           {warehouse.name}
