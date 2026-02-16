@@ -226,7 +226,7 @@ export default function VastraDrobeIMS() {
       localStorage.removeItem("token");
       localStorage.removeItem("user");
       window.location.href = "/";
-      return;
+      return null;
     }
 
     const data = await response.json();
@@ -776,14 +776,14 @@ export default function VastraDrobeIMS() {
     }
   };
 
-  useEffect(() => {
-    const loadProducts = async () => {
-      const data = await apiCall("/products/list");
-      setProducts(data.products);
-    };
+  // useEffect(() => {
+  //   const loadProducts = async () => {
+  //     const data = await apiCall("/products/list");
+  //     setProducts(data.products);
+  //   };
 
-    loadProducts();
-  }, []);
+  //   loadProducts();
+  // }, []);
 
   // Check for existing token on mount
   useEffect(() => {
