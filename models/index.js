@@ -7,13 +7,13 @@ import mongoose from "mongoose";
 // Product Schema (Existing - DO NOT MODIFY STRUCTURE)
 const ProductSchema = new mongoose.Schema(
   {
-    productId: { type: Number, unique: true }, // Auto-increment ID
+    productId: { type: Number, unique: true },
     name: { type: String, required: true },
     price: { type: Number, required: true },
     mrp: { type: Number },
     category: { type: String, required: true },
     subcategory: { type: String },
-    sizes: [{ type: String }], // e.g., ["5-6Y", "6-7Y", "8-9Y"]
+    sizes: [{ type: String }],
     color: {
       type: [String],
       required: true,
@@ -24,16 +24,43 @@ const ProductSchema = new mongoose.Schema(
     },
     images: [{ type: String }],
     description: { type: String },
+
     // Optional fields that IMS can add without breaking VastraDrobe
     sku: { type: String },
     brand: { type: String },
-    stock: { type: Number, default: 0 }, // Denormalized total stock (optional)
+    stock: { type: Number, default: 0 },
     isActive: {
       type: Boolean,
       default: true,
     },
+
+    // 🔥 NEW FIELDS (Clean Extensions)
+
+    sizeChartType: {
+      type: String,
+      enum: [
+        "kidsHoodie",
+        "fullSleeveTop",
+        "ribbedTop",
+        "generalTopBottom",
+      ],
+    },
+
+    productDetails: {
+      material: { type: String },
+      closureType: { type: String },
+      careInstructions: { type: String },
+      style: { type: String },
+      pattern: { type: String },
+      countryOfOrigin: { type: String },
+      manufacturer: { type: String },
+      manufacturerContact: { type: String },
+      packer: { type: String },
+      packerContact: { type: String },
+      unitCount: { type: String },
+    },
   },
-  { timestamps: true },
+  { timestamps: true }
 );
 
 // Orders Schema (Existing - Read-only)

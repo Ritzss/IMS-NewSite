@@ -175,6 +175,23 @@ export async function POST(request, { params }) {
         .map((c) => c.trim().toLowerCase())
         .filter(Boolean);
 
+      // 🔥 NEW FIELDS
+      const sizeChartType = formData.get("sizeChartType") || null;
+
+      let productDetails = {};
+      const productDetailsRaw = formData.get("productDetails");
+
+      if (productDetailsRaw) {
+        try {
+          productDetails = JSON.parse(productDetailsRaw);
+        } catch (err) {
+          return Response.json(
+            { error: "Invalid productDetails format" },
+            { status: 400 },
+          );
+        }
+      }
+
       if (!name || !price || !color.length) {
         return Response.json(
           { error: "Name, price and at least one color are required" },
@@ -211,10 +228,14 @@ export async function POST(request, { params }) {
         price,
         mrp: mrp || price,
         sizes,
-        color, // ✅ ALWAYS ARRAY
+        color,
         images: imagePaths,
         stock: 0,
         isActive: true,
+
+        // 🔥 SAVE NEW FIELDS
+        sizeChartType,
+        productDetails,
       });
 
       return Response.json({
@@ -223,81 +244,95 @@ export async function POST(request, { params }) {
       });
     }
 
-if (routePath === "products/update") {
-  checkRole(user, ["admin"]);
+    if (routePath === "products/update") {
+      checkRole(user, ["admin"]);
 
-  const formData = await request.formData();
+      const formData = await request.formData();
 
-  const productId = formData.get("productId");
-  const name = formData.get("name");
-  const description = formData.get("description");
-  const category = formData.get("category");
-  const subcategory = formData.get("subcategory");
-  const brand = formData.get("brand");
-  const price = Number(formData.get("price"));
-  const mrp = Number(formData.get("mrp"));
+      const productId = Number(formData.get("productId"));
+      const name = formData.get("name");
+      const description = formData.get("description");
+      const category = formData.get("category");
+      const subcategory = formData.get("subcategory");
+      const brand = formData.get("brand");
+      const price = Number(formData.get("price"));
+      const mrp = Number(formData.get("mrp"));
 
-  const sizes = JSON.parse(formData.get("sizes") || "[]");
-  const color = JSON.parse(formData.get("color") || "[]");
-  const existingImages = JSON.parse(
-    formData.get("existingImages") || "[]"
-  );
+      const sizes = JSON.parse(formData.get("sizes") || "[]");
+      const color = JSON.parse(formData.get("color") || "[]");
+      const existingImages = JSON.parse(formData.get("existingImages") || "[]");
 
-  const imageFiles = formData.getAll("images");
+      // 🔥 NEW FIELDS
+      const sizeChartType = formData.get("sizeChartType") || null;
 
-  let uploadedImages = [];
+      let productDetails = {};
+      const productDetailsRaw = formData.get("productDetails");
 
-  for (const file of imageFiles) {
-    if (file && file.size > 0) {
-      const buffer = Buffer.from(await file.arrayBuffer());
+      if (productDetailsRaw) {
+        try {
+          productDetails = JSON.parse(productDetailsRaw);
+        } catch (err) {
+          return Response.json(
+            { error: "Invalid productDetails format" },
+            { status: 400 },
+          );
+        }
+      }
 
-      const uploadResult = await new Promise((resolve, reject) => {
-        const stream = cloudinary.uploader.upload_stream(
-          { folder: "products" },
-          (error, result) => {
-            if (error) reject(error);
-            else resolve(result);
-          }
-        );
-        stream.end(buffer);
+      const imageFiles = formData.getAll("images");
+      let uploadedImages = [];
+
+      for (const file of imageFiles) {
+        if (file && file.size > 0) {
+          const buffer = Buffer.from(await file.arrayBuffer());
+
+          const uploadResult = await new Promise((resolve, reject) => {
+            const stream = cloudinary.uploader.upload_stream(
+              { folder: "products" },
+              (error, result) => {
+                if (error) reject(error);
+                else resolve(result);
+              },
+            );
+            stream.end(buffer);
+          });
+
+          uploadedImages.push(uploadResult.secure_url);
+        }
+      }
+
+      const finalImages = [...existingImages, ...uploadedImages];
+
+      const product = await Product.findOneAndUpdate(
+        { productId },
+        {
+          $set: {
+            name,
+            description,
+            category,
+            subcategory,
+            brand,
+            price,
+            mrp,
+            sizes,
+            color,
+            images: finalImages,
+            sizeChartType,
+            productDetails,
+          },
+        },
+        { new: true },
+      );
+
+      if (!product) {
+        return Response.json({ error: "Product not found" }, { status: 404 });
+      }
+
+      return Response.json({
+        message: "Product updated successfully",
+        product,
       });
-
-      uploadedImages.push(uploadResult.secure_url);
     }
-  }
-
-  const finalImages = [...existingImages, ...uploadedImages];
-
-  const product = await Product.findOneAndUpdate(
-    { productId },
-    {
-      $set: {
-        name,
-        description,
-        category,
-        subcategory,
-        brand,
-        price,
-        mrp,
-        sizes,
-        color,
-        images: finalImages,
-      },
-    },
-    { new: true }
-  );
-
-  if (!product) {
-    return Response.json({ error: "Product not found" }, { status: 404 });
-  }
-
-  return Response.json({
-    message: "Product updated successfully",
-    product,
-  });
-}
-
-
 
     // ----- WAREHOUSES -----
 
@@ -884,7 +919,7 @@ export async function GET(request, { params }) {
           isActive: true,
         })
           .select(
-            "productId name stock description price mrp color images brand category subcategory sizes stock",
+            "productId name stock description price mrp color images brand category subcategory sizes sizeChartType productDetails",
           )
           .lean();
 
@@ -903,7 +938,7 @@ export async function GET(request, { params }) {
 
       const products = await Product.find(filter)
         .select(
-          "productId name stock description price mrp color images brand category subcategory sizes stock",
+         "productId name stock description price mrp color images brand category subcategory sizes sizeChartType productDetails",
         )
         .sort({ createdAt: -1 })
         .skip(skip)
@@ -940,6 +975,46 @@ export async function GET(request, { params }) {
       }
 
       return Response.json({ product });
+    }
+
+    // GET /api/ims/public/inventory/list/productId&lowstock&limit
+    if (routePath === "public/inventory/list") {
+      const productId = searchParams.get("productId");
+      const warehouseId = searchParams.get("warehouseId");
+      const size = searchParams.get("size");
+      const lowStock = searchParams.get("lowStock") === "true";
+      const limit = parseInt(searchParams.get("limit") || "100");
+
+      const query = {};
+      if (productId) query.productId = parseInt(productId);
+      if (warehouseId) query.warehouseId = warehouseId;
+      if (size) query.size = size;
+      if (lowStock) {
+        query.$expr = { $lte: ["$quantity", "$reorderLevel"] };
+      }
+
+      const inventory = await IMSInventory.find(query)
+        .populate("warehouseId")
+        .limit(limit)
+        .lean();
+
+      // Enrich with product details
+      const enrichedInventory = await Promise.all(
+        inventory.map(async (inv) => {
+          const product = await Product.findOne({
+            productId: inv.productId,
+          }).lean();
+          return {
+            ...inv,
+            product: product || null,
+          };
+        }),
+      );
+
+      return Response.json({
+        inventory: enrichedInventory,
+        total: inventory.length,
+      });
     }
 
     // Auth required for all GET routes

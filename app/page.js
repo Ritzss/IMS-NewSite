@@ -78,17 +78,30 @@ export default function VastraDrobeIMS() {
   // Products state
   const [products, setProducts] = useState([]);
   const [productForm, setProductForm] = useState({
-    productId: "",
     name: "",
     description: "",
     category: "",
     subcategory: "",
+    color: "",
     brand: "",
     price: 0,
     mrp: 0,
-    sizes: [],
-    color: [],
+    sizes: "",
     images: [],
+    sizeChartType: "",
+    productDetails: {
+      material: "",
+      closureType: "",
+      careInstructions: "",
+      style: "",
+      pattern: "",
+      countryOfOrigin: "",
+      manufacturer: "",
+      manufacturerContact: "",
+      packer: "",
+      packerContact: "",
+      unitCount: "",
+    },
   });
   const [showProductDialog, setShowProductDialog] = useState(false);
   const [isEditingProduct, setIsEditingProduct] = useState(false);
@@ -366,6 +379,11 @@ export default function VastraDrobeIMS() {
       formData.append("mrp", productForm.mrp);
       formData.append("sizes", productForm.sizes);
       formData.append("color", productForm.color);
+      formData.append("sizeChartType", productForm.sizeChartType || "");
+      formData.append(
+        "productDetails",
+        JSON.stringify(productForm.productDetails || {}),
+      );
 
       productForm.images.forEach((file) => {
         formData.append("images", file);
@@ -402,10 +420,24 @@ export default function VastraDrobeIMS() {
         brand: "",
         price: 0,
         mrp: 0,
-        sizes: [],
-        color: [],
+        sizes: "",
+        color: "",
         images: [],
         isActive: true,
+        sizeChartType: "",
+        productDetails: {
+          material: "",
+          closureType: "",
+          careInstructions: "",
+          style: "",
+          pattern: "",
+          countryOfOrigin: "",
+          manufacturer: "",
+          manufacturerContact: "",
+          packer: "",
+          packerContact: "",
+          unitCount: "",
+        },
       });
 
       loadProducts();
@@ -414,62 +446,65 @@ export default function VastraDrobeIMS() {
     }
   };
 
- const updateProduct = async (e) => {
-  e.preventDefault();
+  const updateProduct = async (e) => {
+    e.preventDefault();
 
-  try {
-    const formData = new FormData();
+    try {
+      const formData = new FormData();
 
-    formData.append("productId", productForm.productId);
-    formData.append("name", productForm.name);
-    formData.append("description", productForm.description);
-    formData.append("category", productForm.category);
-    formData.append("subcategory", productForm.subcategory);
-    formData.append("brand", productForm.brand);
-    formData.append("price", productForm.price);
-    formData.append("mrp", productForm.mrp);
+      formData.append("productId", productForm.productId);
+      formData.append("name", productForm.name);
+      formData.append("description", productForm.description);
+      formData.append("category", productForm.category);
+      formData.append("subcategory", productForm.subcategory);
+      formData.append("brand", productForm.brand);
+      formData.append("price", productForm.price);
+      formData.append("mrp", productForm.mrp);
+      formData.append("sizeChartType", productForm.sizeChartType || "");
+      formData.append(
+        "productDetails",
+        JSON.stringify(productForm.productDetails || {}),
+      );
+      formData.append("sizes", JSON.stringify(productForm.sizes || []));
+      formData.append("color", JSON.stringify(productForm.color || []));
 
-    formData.append("sizes", JSON.stringify(productForm.sizes || []));
-    formData.append("color", JSON.stringify(productForm.color || []));
+      // send existing image URLs
+      formData.append(
+        "existingImages",
+        JSON.stringify(productForm.existingImages || []),
+      );
 
-    // send existing image URLs
-    formData.append(
-      "existingImages",
-      JSON.stringify(productForm.existingImages || [])
-    );
+      // send new images only
+      if (productForm.images && productForm.images.length > 0) {
+        productForm.images.forEach((file) => {
+          if (file instanceof File) {
+            formData.append("images", file);
+          }
+        });
+      }
 
-    // send new images only
-    if (productForm.images && productForm.images.length > 0) {
-      productForm.images.forEach((file) => {
-        if (file instanceof File) {
-          formData.append("images", file);
-        }
+      const res = await fetch("/api/ims/products/update", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        body: formData,
       });
+
+      const data = await res.json();
+
+      if (!res.ok) throw new Error(data.error || "Failed");
+
+      toast.success("Product updated successfully");
+
+      setShowProductDialog(false);
+      setIsEditingProduct(false);
+
+      loadProducts();
+    } catch (err) {
+      toast.error(err.message);
     }
-
-    const res = await fetch("/api/ims/products/update", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-      body: formData,
-    });
-
-    const data = await res.json();
-
-    if (!res.ok) throw new Error(data.error || "Failed");
-
-    toast.success("Product updated successfully");
-
-    setShowProductDialog(false);
-    setIsEditingProduct(false);
-
-    loadProducts();
-  } catch (err) {
-    toast.error(err.message);
-  }
-};
-
+  };
 
   const editProduct = (product) => {
     setProductForm({
@@ -1108,7 +1143,7 @@ export default function VastraDrobeIMS() {
                         onSubmit={
                           isEditingProduct ? updateProduct : createProduct
                         }
-                        className="space-y-4"
+                        className="space-y-2"
                       >
                         <div>
                           <Label>Product Name</Label>
@@ -1226,21 +1261,50 @@ export default function VastraDrobeIMS() {
                             />
                           </div>
                         </div>
-                        <div>
-                          <Label>Sizes</Label>
-                          <Input
-                            placeholder="e.g., S,M,L,XL or 5-6Y,7-8Y,9-10Y"
-                            value={productForm.sizes}
-                            onChange={(e) =>
-                              setProductForm({
-                                ...productForm,
-                                sizes: e.target.value,
-                              })
-                            }
-                          />
-                          <p className="text-xs text-muted-foreground mt-1">
-                            Comma-separated list of sizes
-                          </p>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <Label>Sizes</Label>
+                            <Input
+                              placeholder="e.g., S,M,L,XL or 5-6Y,7-8Y,9-10Y"
+                              value={productForm.sizes}
+                              onChange={(e) =>
+                                setProductForm({
+                                  ...productForm,
+                                  sizes: e.target.value,
+                                })
+                              }
+                            />
+                          </div>
+                          <div>
+                            <Label>Size Chart Type</Label>
+                            <Select
+                              value={productForm.sizeChartType}
+                              onValueChange={(value) =>
+                                setProductForm({
+                                  ...productForm,
+                                  sizeChartType: value,
+                                })
+                              }
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select size chart type" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="kidsHoodie">
+                                  Kids Hoodie
+                                </SelectItem>
+                                <SelectItem value="fullSleeveTop">
+                                  Full Sleeve Top
+                                </SelectItem>
+                                <SelectItem value="ribbedTop">
+                                  Ribbed Top
+                                </SelectItem>
+                                <SelectItem value="generalTopBottom">
+                                  General Top/Bottom
+                                </SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
                         </div>
                         <div>
                           <Label>Product Images</Label>
@@ -1260,6 +1324,127 @@ export default function VastraDrobeIMS() {
                           <p className="text-xs text-muted-foreground mt-1">
                             Upload product images (max 5)
                           </p>
+                        </div>
+                        <div>
+                          <h3 className="font-semibold">Product Details</h3>
+
+                          <div className="grid grid-cols-4 gap-1">
+                            <Input
+                              placeholder="Material"
+                              value={productForm.productDetails?.material}
+                              onChange={(e) =>
+                                setProductForm({
+                                  ...productForm,
+                                  productDetails: {
+                                    ...productForm.productDetails,
+                                    material: e.target.value,
+                                  },
+                                })
+                              }
+                            />
+
+                            <Input
+                              placeholder="Closure Type"
+                              value={productForm.productDetails?.closureType}
+                              onChange={(e) =>
+                                setProductForm({
+                                  ...productForm,
+                                  productDetails: {
+                                    ...productForm.productDetails,
+                                    closureType: e.target.value,
+                                  },
+                                })
+                              }
+                            />
+
+                            <Input
+                              placeholder="Care Instructions"
+                              value={
+                                productForm.productDetails?.careInstructions
+                              }
+                              onChange={(e) =>
+                                setProductForm({
+                                  ...productForm,
+                                  productDetails: {
+                                    ...productForm.productDetails,
+                                    careInstructions: e.target.value,
+                                  },
+                                })
+                              }
+                            />
+
+                            <Input
+                              placeholder="Style"
+                              value={productForm.productDetails?.style}
+                              onChange={(e) =>
+                                setProductForm({
+                                  ...productForm,
+                                  productDetails: {
+                                    ...productForm.productDetails,
+                                    style: e.target.value,
+                                  },
+                                })
+                              }
+                            />
+
+                            <Input
+                              placeholder="Pattern"
+                              value={productForm.productDetails?.pattern}
+                              onChange={(e) =>
+                                setProductForm({
+                                  ...productForm,
+                                  productDetails: {
+                                    ...productForm.productDetails,
+                                    pattern: e.target.value,
+                                  },
+                                })
+                              }
+                            />
+
+                            <Input
+                              placeholder="Country of Origin"
+                              value={
+                                productForm.productDetails?.countryOfOrigin
+                              }
+                              onChange={(e) =>
+                                setProductForm({
+                                  ...productForm,
+                                  productDetails: {
+                                    ...productForm.productDetails,
+                                    countryOfOrigin: e.target.value,
+                                  },
+                                })
+                              }
+                            />
+
+                            <Input
+                              placeholder="Manufacturer"
+                              value={productForm.productDetails?.manufacturer}
+                              onChange={(e) =>
+                                setProductForm({
+                                  ...productForm,
+                                  productDetails: {
+                                    ...productForm.productDetails,
+                                    manufacturer: e.target.value,
+                                  },
+                                })
+                              }
+                            />
+
+                            <Input
+                              placeholder="Unit Count"
+                              value={productForm.productDetails?.unitCount}
+                              onChange={(e) =>
+                                setProductForm({
+                                  ...productForm,
+                                  productDetails: {
+                                    ...productForm.productDetails,
+                                    unitCount: e.target.value,
+                                  },
+                                })
+                              }
+                            />
+                          </div>
                         </div>
                         <Button type="submit" className="w-full">
                           {isEditingProduct
