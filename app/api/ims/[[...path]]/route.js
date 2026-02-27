@@ -15,6 +15,7 @@ import {
   IMSInventory,
   IMSStockMovement,
   IMSActivityLog,
+  Counter,
 } from "@/models/index";
 import {
   addStock,
@@ -62,8 +63,11 @@ export async function POST(request, { params }) {
     const resolveParam = await params;
     const routePath = resolveParam?.path?.join("/") || "";
     const authHeader = request.headers.get("authorization");
+    function escapeRegex(text) {
+      return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    }
 
-    console.log("IMS POST path:", routePath); // Debug
+    // console.log("IMS POST path:", routePath); // Debug
 
     // =============================
     // PUBLIC ROUTES (No Auth)
@@ -74,7 +78,10 @@ export async function POST(request, { params }) {
 
       const { email, password } = body;
 
-      const user = await IMSAdminUser.findOne({ email, isActive: true });
+      const user = await IMSAdminUser.findOne({
+        email: email.toLowerCase().trim(),
+        isActive: true,
+      });
       if (!user) {
         return Response.json({ error: "Invalid credentials" }, { status: 401 });
       }
@@ -116,20 +123,29 @@ export async function POST(request, { params }) {
     // =============================
 
     const user = verifyToken(authHeader);
+    if (!user) {
+      return Response.json({ error: "Unauthorized" }, { status: 401 });
+    }
 
     // ----- PRODUCTS -----
 
     if (routePath === "products/list") {
       const body = await request.json();
 
-      const { search, category, limit = 50, page = 1 } = body;
+      let { search, category, limit = 50, page = 1 } = body;
 
+      const safeLimit = Math.min(parseInt(limit) || 50, 100);
+      const safePage = Math.max(parseInt(page) || 1, 1);
       const query = {};
       if (search) {
+        if (search) {
+          search = search.trim().slice(0, 50);
+        }
+        const safeSearch = escapeRegex(search);
         query.$or = [
-          { name: { $regex: search, $options: "i" } },
-          { category: { $regex: search, $options: "i" } },
-          { subcategory: { $regex: search, $options: "i" } },
+          { name: { $regex: safeSearch, $options: "i" } },
+          { category: { $regex: safeSearch, $options: "i" } },
+          { subcategory: { $regex: safeSearch, $options: "i" } },
         ];
       }
       if (category) {
@@ -137,8 +153,8 @@ export async function POST(request, { params }) {
       }
 
       const products = await Product.find(query)
-        .limit(parseInt(limit))
-        .skip((parseInt(page) - 1) * parseInt(limit))
+        .limit(parseInt(safeLimit))
+        .skip((parseInt(safePage) - 1) * parseInt(safeLimit))
         .sort({ createdAt: -1 })
         .lean();
 
@@ -147,8 +163,8 @@ export async function POST(request, { params }) {
       return Response.json({
         products,
         total,
-        page: parseInt(page),
-        limit: parseInt(limit),
+        page: parseInt(safePage),
+        limit: parseInt(safeLimit),
       });
     }
 
@@ -170,12 +186,8 @@ export async function POST(request, { params }) {
         .map((s) => s.trim())
         .filter(Boolean);
 
-      const color = (formData.get("color") || "")
-        .split(",")
-        .map((c) => c.trim().toLowerCase())
-        .filter(Boolean);
+      const color = formData.get("color")?.toLowerCase().trim();
 
-      // 🔥 NEW FIELDS
       const sizeChartType = formData.get("sizeChartType") || null;
 
       let productDetails = {};
@@ -184,7 +196,7 @@ export async function POST(request, { params }) {
       if (productDetailsRaw) {
         try {
           productDetails = JSON.parse(productDetailsRaw);
-        } catch (err) {
+        } catch {
           return Response.json(
             { error: "Invalid productDetails format" },
             { status: 400 },
@@ -192,31 +204,115 @@ export async function POST(request, { params }) {
         }
       }
 
-      if (!name || !price || !color.length) {
+      if (!name || !price || !color) {
         return Response.json(
-          { error: "Name, price and at least one color are required" },
+          { error: "Name, price and color are required" },
           { status: 400 },
         );
       }
 
       const imageFiles = formData.getAll("images");
+
+      // ===== Image Validation =====
+      const MAX_FILE_SIZE = 5 * 1024 * 1024;
+      const MAX_IMAGES = 5;
+      const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
+
+      if (imageFiles.length > MAX_IMAGES) {
+        return Response.json(
+          { error: `Maximum ${MAX_IMAGES} images allowed` },
+          { status: 400 },
+        );
+      }
+
+      for (const file of imageFiles) {
+        if (!file || typeof file === "string") continue;
+
+        if (!ALLOWED_TYPES.includes(file.type)) {
+          return Response.json({ error: "Invalid file type" }, { status: 400 });
+        }
+
+        if (file.size > MAX_FILE_SIZE) {
+          return Response.json(
+            { error: "Image size exceeds 5MB" },
+            { status: 400 },
+          );
+        }
+      }
+
       const imagePaths = [];
 
       for (const file of imageFiles) {
         if (!file || typeof file === "string") continue;
 
         const buffer = Buffer.from(await file.arrayBuffer());
-        const base64 = `data:${file.type};base64,${buffer.toString("base64")}`;
 
-        const upload = await cloudinary.uploader.upload(base64, {
-          folder: "products",
+        const uploadResult = await new Promise((resolve, reject) => {
+          const stream = cloudinary.uploader.upload_stream(
+            {
+              folder: "products",
+              transformation: [
+                { width: 1200, height: 1200, crop: "limit" },
+                { quality: "auto" },
+              ],
+            },
+            (error, result) => {
+              if (error) return reject(error);
+              resolve(result);
+            },
+          );
+
+          stream.end(buffer);
         });
 
-        imagePaths.push(upload.secure_url);
+        imagePaths.push(uploadResult.secure_url);
       }
 
-      const lastProduct = await Product.findOne().sort({ productId: -1 });
-      const nextProductId = (lastProduct?.productId || 0) + 1;
+      // 🔎 Check if product already exists (same name/category/subcategory)
+      const existingProduct = await Product.findOne({
+        name,
+        category,
+        subcategory,
+      });
+
+      if (existingProduct) {
+        // Add new variant
+        await Product.updateOne(
+          { _id: existingProduct._id },
+          {
+            $push: {
+              variants: {
+                color,
+                images: imagePaths,
+                sizes,
+              },
+            },
+          },
+        );
+
+        return Response.json({
+          message: "Variant added to existing product",
+        });
+      }
+
+      // 🔒 Ensure counter synced
+      const maxProduct = await Product.findOne().sort({ productId: -1 }).lean();
+
+      if (maxProduct) {
+        await Counter.updateOne(
+          { name: "productId" },
+          { $max: { value: maxProduct.productId } },
+          { upsert: true },
+        );
+      }
+
+      const counter = await Counter.findOneAndUpdate(
+        { name: "productId" },
+        { $inc: { value: 1 } },
+        { new: true, upsert: true },
+      );
+
+      const nextProductId = counter.value;
 
       const product = await Product.create({
         productId: nextProductId,
@@ -227,15 +323,17 @@ export async function POST(request, { params }) {
         brand,
         price,
         mrp: mrp || price,
-        sizes,
-        color,
-        images: imagePaths,
         stock: 0,
         isActive: true,
-
-        // 🔥 SAVE NEW FIELDS
         sizeChartType,
         productDetails,
+        variants: [
+          {
+            color,
+            images: imagePaths,
+            sizes,
+          },
+        ],
       });
 
       return Response.json({
@@ -258,11 +356,6 @@ export async function POST(request, { params }) {
       const price = Number(formData.get("price"));
       const mrp = Number(formData.get("mrp"));
 
-      const sizes = JSON.parse(formData.get("sizes") || "[]");
-      const color = JSON.parse(formData.get("color") || "[]");
-      const existingImages = JSON.parse(formData.get("existingImages") || "[]");
-
-      // 🔥 NEW FIELDS
       const sizeChartType = formData.get("sizeChartType") || null;
 
       let productDetails = {};
@@ -271,37 +364,13 @@ export async function POST(request, { params }) {
       if (productDetailsRaw) {
         try {
           productDetails = JSON.parse(productDetailsRaw);
-        } catch (err) {
+        } catch {
           return Response.json(
             { error: "Invalid productDetails format" },
             { status: 400 },
           );
         }
       }
-
-      const imageFiles = formData.getAll("images");
-      let uploadedImages = [];
-
-      for (const file of imageFiles) {
-        if (file && file.size > 0) {
-          const buffer = Buffer.from(await file.arrayBuffer());
-
-          const uploadResult = await new Promise((resolve, reject) => {
-            const stream = cloudinary.uploader.upload_stream(
-              { folder: "products" },
-              (error, result) => {
-                if (error) reject(error);
-                else resolve(result);
-              },
-            );
-            stream.end(buffer);
-          });
-
-          uploadedImages.push(uploadResult.secure_url);
-        }
-      }
-
-      const finalImages = [...existingImages, ...uploadedImages];
 
       const product = await Product.findOneAndUpdate(
         { productId },
@@ -314,9 +383,6 @@ export async function POST(request, { params }) {
             brand,
             price,
             mrp,
-            sizes,
-            color,
-            images: finalImages,
             sizeChartType,
             productDetails,
           },
@@ -764,8 +830,25 @@ export async function POST(request, { params }) {
               throw new Error("No warehouse available");
             }
 
-            await IMSInventory.findOneAndUpdate(
+            const inventory = await IMSInventory.findOne(
               { productId, warehouseId: warehouse, size },
+              null,
+              { session },
+            );
+
+            if (!inventory) {
+              throw new Error(`Inventory not found for product ${productId}`);
+            }
+
+            if (inventory.quantity < quantity) {
+              throw new Error(
+                `Insufficient stock for product ${productId}. Available: ${inventory.quantity}`,
+              );
+            }
+
+            // Now safe to deduct
+            await IMSInventory.updateOne(
+              { _id: inventory._id },
               {
                 $inc: { quantity: -quantity },
                 $set: { updatedBy: user.id, lastUpdated: new Date() },
@@ -894,6 +977,9 @@ export async function GET(request, { params }) {
     const routePath = rawPath.replace(/^ims\//, "");
     const authHeader = request.headers.get("authorization");
     const url = new URL(request.url);
+    function escapeRegex(text) {
+      return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    }
     const searchParams = url.searchParams;
 
     // =============================
@@ -919,14 +1005,13 @@ export async function GET(request, { params }) {
           isActive: true,
         })
           .select(
-            "productId name stock description price mrp color images brand category subcategory sizes sizeChartType productDetails",
+            "productId name stock description price mrp variants brand category subcategory sizeChartType productDetails",
           )
           .lean();
 
         return Response.json({ products });
       }
 
-      // 🔁 existing logic untouched
       const category = searchParams.get("category");
 
       const page = Math.max(parseInt(searchParams.get("page")) || 1, 1);
@@ -938,7 +1023,7 @@ export async function GET(request, { params }) {
 
       const products = await Product.find(filter)
         .select(
-         "productId name stock description price mrp color images brand category subcategory sizes sizeChartType productDetails",
+          "productId name stock description price mrp variants brand category subcategory sizeChartType productDetails",
         )
         .sort({ createdAt: -1 })
         .skip(skip)
@@ -978,62 +1063,102 @@ export async function GET(request, { params }) {
     }
 
     // GET /api/ims/public/inventory/list/productId&lowstock&limit
-    if (routePath === "public/inventory/list") {
-      const productId = searchParams.get("productId");
-      const warehouseId = searchParams.get("warehouseId");
-      const size = searchParams.get("size");
-      const lowStock = searchParams.get("lowStock") === "true";
-      const limit = parseInt(searchParams.get("limit") || "100");
+    // if (routePath === "public/inventory/list") {
+    //   const productId = searchParams.get("productId");
+    //   const warehouseId = searchParams.get("warehouseId");
+    //   const size = searchParams.get("size");
+    //   const lowStock = searchParams.get("lowStock") === "true";
+    //   const limit = Math.min(parseInt(searchParams.get("limit")) || 8, 100);
 
-      const query = {};
-      if (productId) query.productId = parseInt(productId);
-      if (warehouseId) query.warehouseId = warehouseId;
-      if (size) query.size = size;
-      if (lowStock) {
-        query.$expr = { $lte: ["$quantity", "$reorderLevel"] };
+    //   // const limit = parseInt(searchParams.get("limit") || "100");
+
+    //   const query = {};
+    //   if (productId) query.productId = parseInt(productId);
+    //   if (warehouseId) query.warehouseId = warehouseId;
+    //   if (size) query.size = size;
+    //   if (lowStock) {
+    //     query.$expr = { $lte: ["$quantity", "$reorderLevel"] };
+    //   }
+
+    //   const inventory = await IMSInventory.find(query)
+    //     .populate("warehouseId")
+    //     .limit(limit)
+    //     .lean();
+
+    //   // Enrich with product details
+    //   const enrichedInventory = await Promise.all(
+    //     inventory.map(async (inv) => {
+    //       const product = await Product.findOne({
+    //         productId: inv.productId,
+    //       }).lean();
+    //       return {
+    //         ...inv,
+    //         product: product || null,
+    //       };
+    //     }),
+    //   );
+
+    //   return Response.json({
+    //     inventory: enrichedInventory,
+    //     total: inventory.length,
+    //   });
+    // }
+    if (routePath === "public/inventory/list") {
+      const productId = parseInt(searchParams.get("productId"));
+      const size = searchParams.get("size");
+
+      if (!Number.isInteger(productId)) {
+        return Response.json({ error: "Invalid product ID" }, { status: 400 });
       }
 
-      const inventory = await IMSInventory.find(query)
-        .populate("warehouseId")
-        .limit(limit)
-        .lean();
+      const query = { productId };
 
-      // Enrich with product details
-      const enrichedInventory = await Promise.all(
-        inventory.map(async (inv) => {
-          const product = await Product.findOne({
-            productId: inv.productId,
-          }).lean();
-          return {
-            ...inv,
-            product: product || null,
-          };
-        }),
-      );
+      if (size) {
+        query.size = size;
+      }
+
+      // Aggregate total stock across warehouses
+      const result = await IMSInventory.aggregate([
+        { $match: query },
+        { $group: { _id: null, totalQuantity: { $sum: "$quantity" } } },
+      ]);
+
+      const totalQuantity = result[0]?.totalQuantity || 0;
 
       return Response.json({
-        inventory: enrichedInventory,
-        total: inventory.length,
+        productId,
+        totalQuantity,
+        inStock: totalQuantity > 0,
       });
     }
 
     // Auth required for all GET routes
     const user = verifyToken(authHeader);
 
+    if (!user) {
+      return Response.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     // ----- PRODUCTS -----
 
     if (routePath === "products/list") {
-      const search = searchParams.get("search") || "";
+      let search = searchParams.get("search") || "";
       const category = searchParams.get("category") || "";
-      const limit = parseInt(searchParams.get("limit") || "50");
-      const page = parseInt(searchParams.get("page") || "1");
+      const limit = Math.min(parseInt(searchParams.get("limit")) || 8, 50);
+      search = search.trim().slice(0, 50); // limit to 50 chars
+      const page = Math.max(parseInt(searchParams.get("page")) || 1, 1);
+
+      // const limit = parseInt(searchParams.get("limit") || "50");
+
+      // const page = parseInt(searchParams.get("page") || 1,1);
 
       const query = {};
       if (search) {
+        const safeSearch = escapeRegex(search);
         query.$or = [
-          { name: { $regex: search, $options: "i" } },
-          { category: { $regex: search, $options: "i" } },
-          { subcategory: { $regex: search, $options: "i" } },
+          { name: { $regex: safeSearch, $options: "i" } },
+          { category: { $regex: safeSearch, $options: "i" } },
+          { subcategory: { $regex: safeSearch, $options: "i" } },
         ];
       }
       if (category) {
@@ -1078,7 +1203,9 @@ export async function GET(request, { params }) {
       const productId = searchParams.get("productId");
       const warehouseId = searchParams.get("warehouseId");
       const lowStock = searchParams.get("lowStock") === "true";
-      const limit = parseInt(searchParams.get("limit") || "100");
+      const limit = Math.min(parseInt(searchParams.get("limit")) || 8, 100);
+
+      // const limit = parseInt(searchParams.get("limit") || "100");
 
       const query = {};
       if (productId) query.productId = parseInt(productId);
@@ -1142,8 +1269,9 @@ export async function GET(request, { params }) {
         startDate: searchParams.get("startDate"),
         endDate: searchParams.get("endDate"),
       };
+      const limit = Math.min(parseInt(searchParams.get("limit")) || 8, 50);
 
-      const limit = parseInt(searchParams.get("limit") || "50");
+      // const limit = parseInt(searchParams.get("limit") || "50");
 
       const movements = await getStockMovements(filters, limit);
 
@@ -1234,7 +1362,9 @@ export async function GET(request, { params }) {
     if (routePath === "activity-logs/list") {
       checkRole(user, ["admin"]);
 
-      const limit = parseInt(searchParams.get("limit") || "100");
+      const limit = Math.min(parseInt(searchParams.get("limit")) || 8, 100);
+
+      // const limit = parseInt(searchParams.get("limit") || "100");
 
       const logs = await IMSActivityLog.find()
         .populate("userId", "name email")
@@ -1261,8 +1391,11 @@ export async function GET(request, { params }) {
     // ----- ORDERS -----
 
     if (routePath === "orders/list") {
-      const limit = parseInt(searchParams.get("limit") || "50");
-      const page = parseInt(searchParams.get("page") || "1");
+      checkRole(user, ["admin"]);
+      const limit = Math.min(parseInt(searchParams.get("limit")) || 8, 50);
+      const page = Math.max(parseInt(searchParams.get("page")) || 1, 1);
+      // const limit = parseInt(searchParams.get("limit") || "50");
+      // const page = parseInt(searchParams.get("page") || "1");
       const status = searchParams.get("status");
 
       const query = {};
@@ -1304,6 +1437,7 @@ export async function GET(request, { params }) {
     );
   }
 }
+
 // Add missing DELETE handler
 export async function DELETE(request, { params }) {
   try {
@@ -1355,7 +1489,9 @@ export async function DELETE(request, { params }) {
     if (routePath === "activity-logs/list") {
       checkRole(user, ["admin"]);
 
-      const limit = parseInt(searchParams.get("limit") || "100");
+      const limit = Math.min(parseInt(searchParams.get("limit")) || 8, 100);
+
+      // const limit = parseInt(searchParams.get("limit") || "100");
 
       const logs = await IMSActivityLog.find()
         .populate("userId", "name email")
@@ -1378,8 +1514,10 @@ export async function DELETE(request, { params }) {
     // ----- ORDERS -----
 
     if (routePath === "orders/list") {
-      const limit = parseInt(searchParams.get("limit") || "50");
-      const page = parseInt(searchParams.get("page") || "1");
+      const limit = Math.min(parseInt(searchParams.get("limit")) || 8, 50);
+      const page = Math.max(parseInt(searchParams.get("page")) || 1, 1);
+      // const limit = parseInt(searchParams.get("limit") || "50");
+      // const page = parseInt(searchParams.get("page") || "1");
       const status = searchParams.get("status");
 
       const query = {};

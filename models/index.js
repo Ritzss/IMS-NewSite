@@ -7,22 +7,28 @@ import mongoose from "mongoose";
 // Product Schema (Existing - DO NOT MODIFY STRUCTURE)
 const ProductSchema = new mongoose.Schema(
   {
-    productId: { type: Number, unique: true },
+    productId: { type: Number, unique: true, index: true },
     name: { type: String, required: true },
     price: { type: Number, required: true },
     mrp: { type: Number },
     category: { type: String, required: true },
     subcategory: { type: String },
-    sizes: [{ type: String }],
-    color: {
-      type: [String],
-      required: true,
-      validate: {
-        validator: (v) => Array.isArray(v) && v.length > 0,
-        message: "Product must have at least one color",
+    variants: [
+      {
+        color: {
+          type: String,
+          required: true,
+        },
+        images: {
+          type: [String],
+          default: [],
+        },
+        sizes: {
+          type: [String],
+          default: [],
+        },
       },
-    },
-    images: [{ type: String }],
+    ],
     description: { type: String },
 
     // Optional fields that IMS can add without breaking VastraDrobe
@@ -38,12 +44,7 @@ const ProductSchema = new mongoose.Schema(
 
     sizeChartType: {
       type: String,
-      enum: [
-        "kidsHoodie",
-        "fullSleeveTop",
-        "ribbedTop",
-        "generalTopBottom",
-      ],
+      enum: ["kidsHoodie", "fullSleeveTop", "ribbedTop", "generalTopBottom"],
     },
 
     productDetails: {
@@ -60,7 +61,7 @@ const ProductSchema = new mongoose.Schema(
       unitCount: { type: String },
     },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 // Orders Schema (Existing - Read-only)
@@ -105,6 +106,15 @@ const CustomerUserSchema = new mongoose.Schema(
   },
   { timestamps: true },
 );
+
+// Counter Schema
+const CounterSchema = new mongoose.Schema({
+  name: { type: String, required: true, unique: true },
+  value: { type: Number, default: 0 },
+});
+
+export const Counter =
+  mongoose.models.Counter || mongoose.model("Counter", CounterSchema);
 
 // ========================
 // IMS-SPECIFIC SCHEMAS (New collections)

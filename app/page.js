@@ -59,6 +59,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
+import React from "react";
 
 const API_BASE = "/api/ims";
 
@@ -367,6 +368,7 @@ export default function VastraDrobeIMS() {
   // CRUD operations
   const createProduct = async (e) => {
     e.preventDefault();
+
     try {
       const formData = new FormData();
 
@@ -377,8 +379,11 @@ export default function VastraDrobeIMS() {
       formData.append("brand", productForm.brand);
       formData.append("price", productForm.price);
       formData.append("mrp", productForm.mrp);
-      formData.append("sizes", productForm.sizes);
-      formData.append("color", productForm.color);
+
+      // 🔥 VARIANT FIELDS
+      formData.append("color", productForm.color); // single string
+      formData.append("sizes", productForm.sizes); // comma separated string
+
       formData.append("sizeChartType", productForm.sizeChartType || "");
       formData.append(
         "productDetails",
@@ -397,20 +402,14 @@ export default function VastraDrobeIMS() {
         body: formData,
       });
 
-      const text = await res.text();
+      const data = await res.json();
 
-      let data;
-      try {
-        data = JSON.parse(text);
-      } catch (e) {
-        console.error("Non-JSON response from server:", text);
-        throw new Error("Server error while creating product");
-      }
       if (!res.ok) throw new Error(data.error || "Failed");
 
-      toast.success("Product created successfully");
+      toast.success(data.message);
 
       setShowProductDialog(false);
+
       setProductForm({
         productId: "",
         name: "",
@@ -423,7 +422,6 @@ export default function VastraDrobeIMS() {
         sizes: "",
         color: "",
         images: [],
-        isActive: true,
         sizeChartType: "",
         productDetails: {
           material: "",
@@ -465,23 +463,6 @@ export default function VastraDrobeIMS() {
         "productDetails",
         JSON.stringify(productForm.productDetails || {}),
       );
-      formData.append("sizes", JSON.stringify(productForm.sizes || []));
-      formData.append("color", JSON.stringify(productForm.color || []));
-
-      // send existing image URLs
-      formData.append(
-        "existingImages",
-        JSON.stringify(productForm.existingImages || []),
-      );
-
-      // send new images only
-      if (productForm.images && productForm.images.length > 0) {
-        productForm.images.forEach((file) => {
-          if (file instanceof File) {
-            formData.append("images", file);
-          }
-        });
-      }
 
       const res = await fetch("/api/ims/products/update", {
         method: "POST",
@@ -512,13 +493,15 @@ export default function VastraDrobeIMS() {
       name: product.name,
       description: product.description || "",
       category: product.category,
-      subCategory: product.subCategory || "",
+      subcategory: product.subcategory || "",
       brand: product.brand || "",
       price: product.price,
       mrp: product.mrp || product.price,
-      sizes: (product.sizes || []).join(","),
-      color: (product.color || []).join(","),
-      images: [], // don’t preload files
+      sizeChartType: product.sizeChartType || "",
+      productDetails: product.productDetails || {},
+      sizes: "", // new variant will define this
+      color: "", // new variant will define this
+      images: [],
     });
 
     setIsEditingProduct(true);
@@ -1473,6 +1456,7 @@ export default function VastraDrobeIMS() {
                       <TableHead>Category</TableHead>
                       <TableHead>SubCategory</TableHead>
                       <TableHead>Base Price</TableHead>
+                      <TableHead>Variants</TableHead>
                       <TableHead>Created</TableHead>
                       {currentUser?.role === "admin" && (
                         <TableHead>Actions</TableHead>
@@ -1482,30 +1466,57 @@ export default function VastraDrobeIMS() {
                   <TableBody>
                     {products.map((product, ind) => {
                       return (
-                        <TableRow key={`${product.id}-${ind}`}>
-                          <TableCell>{product.productId}</TableCell>
-                          <TableCell className="font-medium">
-                            {product.name}
-                          </TableCell>
-                          <TableCell>{product.brand}</TableCell>
-                          <TableCell>{product.category}</TableCell>
-                          <TableCell>{product.subcategory}</TableCell>
-                          <TableCell>₹{product.price}</TableCell>
-                          <TableCell>
-                            {new Date(product.createdAt).toLocaleDateString()}
-                          </TableCell>
-                          {currentUser?.role === "admin" && (
-                            <TableCell>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => editProduct(product)}
-                              >
-                                <Pencil className="w-4 h-4" />
-                              </Button>
+                        <React.Fragment key={`${product.id}-${ind}`}>
+                          <TableRow key={`${product.id}-${ind}`}>
+                            <TableCell>{product.productId}</TableCell>
+                            <TableCell className="font-medium">
+                              {product.name}
                             </TableCell>
+                            <TableCell>{product.brand}</TableCell>
+                            <TableCell>{product.category}</TableCell>
+                            <TableCell>{product.subcategory}</TableCell>
+                            <TableCell>₹{product.price}</TableCell>
+                            <TableCell>
+                              {product.variants?.length || 0}
+                            </TableCell>
+                            <TableCell>
+                              {new Date(product.createdAt).toLocaleDateString()}
+                            </TableCell>
+                            {currentUser?.role === "admin" && (
+                              <TableCell>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => editProduct(product)}
+                                >
+                                  <Pencil className="w-4 h-4" />
+                                </Button>
+                              </TableCell>
+                            )}
+                          </TableRow>
+                          {product.variants?.length > 0 && (
+                            <TableRow>
+                              <TableCell colSpan={8}>
+                                <div className="flex flex-wrap gap-4">
+                                  {product.variants.map((variant, i) => (
+                                    <div
+                                      key={i}
+                                      className="border rounded p-2 bg-muted text-sm"
+                                    >
+                                      <div>
+                                        <strong>Color:</strong> {variant.color}
+                                      </div>
+                                      <div>
+                                        <strong>Sizes:</strong>{" "}
+                                        {variant.sizes?.join(", ")}
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </TableCell>
+                            </TableRow>
                           )}
-                        </TableRow>
+                        </React.Fragment>
                       );
                     })}
                   </TableBody>
