@@ -1144,7 +1144,7 @@ export async function GET(request, { params }) {
     if (routePath === "products/list") {
       let search = searchParams.get("search") || "";
       const category = searchParams.get("category") || "";
-      const limit = Math.min(parseInt(searchParams.get("limit")) || 8, 50);
+      const limit = Math.min(parseInt(searchParams.get("limit")) || 50, 150);
       search = search.trim().slice(0, 50); // limit to 50 chars
       const page = Math.max(parseInt(searchParams.get("page")) || 1, 1);
 
