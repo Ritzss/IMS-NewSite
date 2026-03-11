@@ -2147,7 +2147,7 @@ export default function VastraDrobeIMS() {
                         <TableCell className="text-sm">
                           {order.items?.length
                             ? order.items
-                                .map((p) => `ID ${p.productId} (Qty: ${p.qty})`)
+                                .map((p) => `ID ${p.productId} (Qty: ${p.qty}) [Size: ${p.size}]`)
                                 .join(", ")
                             : "—"}
                         </TableCell>

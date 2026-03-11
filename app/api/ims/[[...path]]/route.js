@@ -817,17 +817,35 @@ export async function POST(request, { params }) {
       // 🔻 Deduct inventory ONLY when moving to PACKING
       if (newStatus === "packing") {
         await runTransaction(async (session) => {
-          for (const item of order.items) {
+          for (const rawItem of order.items) {
+            const item = rawItem.toObject ? rawItem.toObject() : rawItem;
+
             const productId = Number(item.productId);
             const quantity = Number(item.qty || item.quantity || 1);
-            const size = item.size || "FREE";
 
-            const warehouse =
-              item.warehouseId ||
-              (await IMSWarehouse.findOne().session(session))?._id;
+            const size =
+              typeof item.size === "string"
+                ? item.size
+                : Array.isArray(item.size)
+                  ? item.size[0]
+                  : null;
+
+            if (!size) {
+              console.warn("Order item missing size:", item);
+              continue;
+            }
+
+            let warehouse = item.warehouseId;
 
             if (!warehouse) {
-              throw new Error("No warehouse available");
+              const warehouseDoc =
+                await IMSWarehouse.findOne().session(session);
+
+              if (!warehouseDoc) {
+                throw new Error("No warehouse configured");
+              }
+
+              warehouse = warehouseDoc._id;
             }
 
             const inventory = await IMSInventory.findOne(
@@ -837,7 +855,9 @@ export async function POST(request, { params }) {
             );
 
             if (!inventory) {
-              throw new Error(`Inventory not found for product ${productId}`);
+              throw new Error(
+                `Inventory not found for product ${productId}, size ${size}, warehouse ${warehouse}`,
+              );
             }
 
             if (inventory.quantity < quantity) {
@@ -846,7 +866,6 @@ export async function POST(request, { params }) {
               );
             }
 
-            // Now safe to deduct
             await IMSInventory.updateOne(
               { _id: inventory._id },
               {
