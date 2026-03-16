@@ -87,22 +87,17 @@ export default function VastraDrobeIMS() {
     brand: "",
     price: 0,
     mrp: 0,
-    sizes: "",
     images: [],
-    sizeChartType: "",
-    productDetails: {
-      material: "",
-      closureType: "",
-      careInstructions: "",
-      style: "",
-      pattern: "",
-      countryOfOrigin: "",
-      manufacturer: "",
-      manufacturerContact: "",
-      packer: "",
-      packerContact: "",
-      unitCount: "",
-    },
+    capacity: 0,
+    weight: 0,
+    details:  {
+        features: [],
+        material: "",
+        finish: "",
+        design: "",
+        sustainability: "",
+        care: [],
+      },
   });
   const [showProductDialog, setShowProductDialog] = useState(false);
   const [isEditingProduct, setIsEditingProduct] = useState(false);
@@ -382,12 +377,11 @@ export default function VastraDrobeIMS() {
 
       // 🔥 VARIANT FIELDS
       formData.append("color", productForm.color); // single string
-      formData.append("sizes", productForm.sizes); // comma separated string
-
-      formData.append("sizeChartType", productForm.sizeChartType || "");
+      formData.append("capacity", productForm.capacity);
+      formData.append("weight", productForm.weight);
       formData.append(
-        "productDetails",
-        JSON.stringify(productForm.productDetails || {}),
+        "details",
+        JSON.stringify(productForm.details || {}),
       );
 
       productForm.images.forEach((file) => {
@@ -419,22 +413,17 @@ export default function VastraDrobeIMS() {
         brand: "",
         price: 0,
         mrp: 0,
-        sizes: "",
+        capacity: 0,
+        weight: 0,
         color: "",
         images: [],
-        sizeChartType: "",
-        productDetails: {
+        details: {
+          features: [],
           material: "",
-          closureType: "",
-          careInstructions: "",
-          style: "",
-          pattern: "",
-          countryOfOrigin: "",
-          manufacturer: "",
-          manufacturerContact: "",
-          packer: "",
-          packerContact: "",
-          unitCount: "",
+          finish: "",
+          design: "",
+          sustainability: "",
+          care: [],
         },
       });
 
@@ -458,10 +447,11 @@ export default function VastraDrobeIMS() {
       formData.append("brand", productForm.brand);
       formData.append("price", productForm.price);
       formData.append("mrp", productForm.mrp);
-      formData.append("sizeChartType", productForm.sizeChartType || "");
+      formData.append("capacity", productForm.capacity);
+      formData.append("weight", productForm.weight);
       formData.append(
-        "productDetails",
-        JSON.stringify(productForm.productDetails || {}),
+        "details",
+        JSON.stringify(productForm.details || {}),
       );
 
       const res = await fetch("/api/ims/products/update", {
@@ -498,7 +488,7 @@ export default function VastraDrobeIMS() {
       price: product.price,
       mrp: product.mrp || product.price,
       sizeChartType: product.sizeChartType || "",
-      productDetails: product.productDetails || {},
+      details: product.details || {},
       sizes: "", // new variant will define this
       color: "", // new variant will define this
       images: [],
@@ -1246,47 +1236,33 @@ export default function VastraDrobeIMS() {
                         </div>
                         <div className="grid grid-cols-2 gap-4">
                           <div>
-                            <Label>Sizes</Label>
+                            <Label>Capacity (ml)</Label>
                             <Input
-                              placeholder="e.g., S,M,L,XL or 5-6Y,7-8Y,9-10Y"
-                              value={productForm.sizes}
+                              type="number"
+                              value={productForm.capacity}
                               onChange={(e) =>
                                 setProductForm({
                                   ...productForm,
-                                  sizes: e.target.value,
+                                  capacity: parseInt(e.target.value),
                                 })
                               }
+                              required
                             />
                           </div>
+
                           <div>
-                            <Label>Size Chart Type</Label>
-                            <Select
-                              value={productForm.sizeChartType}
-                              onValueChange={(value) =>
+                            <Label>Weight (g)</Label>
+                            <Input
+                              type="number"
+                              value={productForm.weight}
+                              onChange={(e) =>
                                 setProductForm({
                                   ...productForm,
-                                  sizeChartType: value,
+                                  weight: parseInt(e.target.value),
                                 })
                               }
-                            >
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select size chart type" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="kidsHoodie">
-                                  Kids Hoodie
-                                </SelectItem>
-                                <SelectItem value="fullSleeveTop">
-                                  Full Sleeve Top
-                                </SelectItem>
-                                <SelectItem value="ribbedTop">
-                                  Ribbed Top
-                                </SelectItem>
-                                <SelectItem value="generalTopBottom">
-                                  General Top/Bottom
-                                </SelectItem>
-                              </SelectContent>
-                            </Select>
+                              required
+                            />
                           </div>
                         </div>
                         <div>
@@ -1311,15 +1287,15 @@ export default function VastraDrobeIMS() {
                         <div>
                           <h3 className="font-semibold">Product Details</h3>
 
-                          <div className="grid grid-cols-4 gap-1">
+                          <div className="grid grid-cols-2 gap-2">
                             <Input
                               placeholder="Material"
-                              value={productForm.productDetails?.material}
+                              value={productForm.details?.material || ""}
                               onChange={(e) =>
                                 setProductForm({
                                   ...productForm,
-                                  productDetails: {
-                                    ...productForm.productDetails,
+                                  details: {
+                                    ...productForm.details,
                                     material: e.target.value,
                                   },
                                 })
@@ -1327,102 +1303,78 @@ export default function VastraDrobeIMS() {
                             />
 
                             <Input
-                              placeholder="Closure Type"
-                              value={productForm.productDetails?.closureType}
+                              placeholder="Finish"
+                              value={productForm.details?.finish || ""}
                               onChange={(e) =>
                                 setProductForm({
                                   ...productForm,
-                                  productDetails: {
-                                    ...productForm.productDetails,
-                                    closureType: e.target.value,
+                                  details: {
+                                    ...productForm.details,
+                                    finish: e.target.value,
                                   },
                                 })
                               }
                             />
 
                             <Input
-                              placeholder="Care Instructions"
+                              placeholder="Design"
+                              value={productForm.details?.design || ""}
+                              onChange={(e) =>
+                                setProductForm({
+                                  ...productForm,
+                                  details: {
+                                    ...productForm.details,
+                                    design: e.target.value,
+                                  },
+                                })
+                              }
+                            />
+
+                            <Input
+                              placeholder="Sustainability"
+                              value={productForm.details?.sustainability || ""}
+                              onChange={(e) =>
+                                setProductForm({
+                                  ...productForm,
+                                  details: {
+                                    ...productForm.details,
+                                    sustainability: e.target.value,
+                                  },
+                                })
+                              }
+                            />
+
+                            <Input
+                              placeholder="Features (comma separated)"
                               value={
-                                productForm.productDetails?.careInstructions
+                                productForm.details?.features?.join(", ") || ""
                               }
                               onChange={(e) =>
                                 setProductForm({
                                   ...productForm,
-                                  productDetails: {
-                                    ...productForm.productDetails,
-                                    careInstructions: e.target.value,
+                                  details: {
+                                    ...productForm.details,
+                                    features: e.target.value
+                                      .split(",")
+                                      .map((f) => f.trim()),
                                   },
                                 })
                               }
                             />
 
                             <Input
-                              placeholder="Style"
-                              value={productForm.productDetails?.style}
-                              onChange={(e) =>
-                                setProductForm({
-                                  ...productForm,
-                                  productDetails: {
-                                    ...productForm.productDetails,
-                                    style: e.target.value,
-                                  },
-                                })
-                              }
-                            />
-
-                            <Input
-                              placeholder="Pattern"
-                              value={productForm.productDetails?.pattern}
-                              onChange={(e) =>
-                                setProductForm({
-                                  ...productForm,
-                                  productDetails: {
-                                    ...productForm.productDetails,
-                                    pattern: e.target.value,
-                                  },
-                                })
-                              }
-                            />
-
-                            <Input
-                              placeholder="Country of Origin"
+                              placeholder="Care Instructions (comma separated)"
                               value={
-                                productForm.productDetails?.countryOfOrigin
+                                productForm.details?.care?.join(", ") || ""
                               }
                               onChange={(e) =>
                                 setProductForm({
                                   ...productForm,
-                                  productDetails: {
-                                    ...productForm.productDetails,
-                                    countryOfOrigin: e.target.value,
-                                  },
-                                })
-                              }
-                            />
-
-                            <Input
-                              placeholder="Manufacturer"
-                              value={productForm.productDetails?.manufacturer}
-                              onChange={(e) =>
-                                setProductForm({
-                                  ...productForm,
-                                  productDetails: {
-                                    ...productForm.productDetails,
-                                    manufacturer: e.target.value,
-                                  },
-                                })
-                              }
-                            />
-
-                            <Input
-                              placeholder="Unit Count"
-                              value={productForm.productDetails?.unitCount}
-                              onChange={(e) =>
-                                setProductForm({
-                                  ...productForm,
-                                  productDetails: {
-                                    ...productForm.productDetails,
-                                    unitCount: e.target.value,
+                                  details: {
+                                    ...productForm.details,
+                                    care: e.target.value
+                                      .split(",")
+                                      .map((c) => c.trim()),
                                   },
                                 })
                               }
@@ -1507,8 +1459,12 @@ export default function VastraDrobeIMS() {
                                         <strong>Color:</strong> {variant.color}
                                       </div>
                                       <div>
-                                        <strong>Sizes:</strong>{" "}
-                                        {variant.sizes?.join(", ")}
+                                        <strong>Capacity:</strong>{" "}
+                                        {variant.capacity} ml
+                                      </div>
+                                      <div>
+                                        <strong>Weight:</strong>{" "}
+                                        {variant.weight} g
                                       </div>
                                     </div>
                                   ))}
@@ -2147,7 +2103,10 @@ export default function VastraDrobeIMS() {
                         <TableCell className="text-sm">
                           {order.items?.length
                             ? order.items
-                                .map((p) => `ID ${p.productId} (Qty: ${p.qty}) [Size: ${p.size}]`)
+                                .map(
+                                  (p) =>
+                                    `ID ${p.productId} (Qty: ${p.qty}) [Size: ${p.size}]`,
+                                )
                                 .join(", ")
                             : "—"}
                         </TableCell>

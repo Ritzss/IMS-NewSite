@@ -153,8 +153,11 @@ export async function POST(request, { params }) {
       }
 
       const products = await Product.find(query)
-        .limit(parseInt(safeLimit))
-        .skip((parseInt(safePage) - 1) * parseInt(safeLimit))
+        .select(
+          "productId name brand category subcategory price mrp variants createdAt",
+        )
+        .limit(safeLimit)
+        .skip((safePage - 1) * safeLimit)
         .sort({ createdAt: -1 })
         .lean();
 
@@ -180,33 +183,26 @@ export async function POST(request, { params }) {
       const brand = formData.get("brand");
       const price = Number(formData.get("price"));
       const mrp = Number(formData.get("mrp"));
-
-      const sizes = (formData.get("sizes") || "")
-        .split(",")
-        .map((s) => s.trim())
-        .filter(Boolean);
-
       const color = formData.get("color")?.toLowerCase().trim();
+      const capacity = Number(formData.get("capacity"));
+      const weight = Number(formData.get("weight"));
+      let details = {};
+      const detailsRaw = formData.get("details");
 
-      const sizeChartType = formData.get("sizeChartType") || null;
-
-      let productDetails = {};
-      const productDetailsRaw = formData.get("productDetails");
-
-      if (productDetailsRaw) {
+      if (detailsRaw) {
         try {
-          productDetails = JSON.parse(productDetailsRaw);
+          details = JSON.parse(detailsRaw);
         } catch {
           return Response.json(
-            { error: "Invalid productDetails format" },
+            { error: "Invalid details format" },
             { status: 400 },
           );
         }
       }
 
-      if (!name || !price || !color) {
+      if (!name || !color || !price) {
         return Response.json(
-          { error: "Name, price and color are required" },
+          { error: "Name, color and price are required" },
           { status: 400 },
         );
       }
@@ -276,6 +272,16 @@ export async function POST(request, { params }) {
       });
 
       if (existingProduct) {
+        const duplicateVariant = existingProduct.variants.find(
+          (v) => v.capacity === capacity && v.color === color,
+        );
+
+        if (duplicateVariant) {
+          return Response.json(
+            { error: "Variant already exists for this capacity and color" },
+            { status: 400 },
+          );
+        }
         // Add new variant
         await Product.updateOne(
           { _id: existingProduct._id },
@@ -284,7 +290,10 @@ export async function POST(request, { params }) {
               variants: {
                 color,
                 images: imagePaths,
-                sizes,
+                capacity,
+                weight,
+                price,
+                mrp: mrp || price,
               },
             },
           },
@@ -325,13 +334,15 @@ export async function POST(request, { params }) {
         mrp: mrp || price,
         stock: 0,
         isActive: true,
-        sizeChartType,
-        productDetails,
+        details,
         variants: [
           {
             color,
             images: imagePaths,
-            sizes,
+            capacity,
+            weight,
+            price,
+            mrp: mrp || price,
           },
         ],
       });
@@ -356,17 +367,15 @@ export async function POST(request, { params }) {
       const price = Number(formData.get("price"));
       const mrp = Number(formData.get("mrp"));
 
-      const sizeChartType = formData.get("sizeChartType") || null;
+      let details = {};
+      const detailsRaw = formData.get("details");
 
-      let productDetails = {};
-      const productDetailsRaw = formData.get("productDetails");
-
-      if (productDetailsRaw) {
+      if (detailsRaw) {
         try {
-          productDetails = JSON.parse(productDetailsRaw);
+          details = JSON.parse(detailsRaw);
         } catch {
           return Response.json(
-            { error: "Invalid productDetails format" },
+            { error: "Invalid details format" },
             { status: 400 },
           );
         }
@@ -383,8 +392,7 @@ export async function POST(request, { params }) {
             brand,
             price,
             mrp,
-            sizeChartType,
-            productDetails,
+            details,
           },
         },
         { new: true },
@@ -1024,7 +1032,7 @@ export async function GET(request, { params }) {
           isActive: true,
         })
           .select(
-            "productId name stock description price mrp variants brand category subcategory sizeChartType productDetails",
+            "productId name stock description price mrp variants brand category subcategory details",
           )
           .lean();
 
@@ -1038,32 +1046,48 @@ export async function GET(request, { params }) {
       const skip = (page - 1) * limit;
 
       const filter = { isActive: true };
-      if (category) filter.category = category;
+      if (category) {
+        filter.category = new RegExp(`^${escapeRegex(category)}$`, "i");
+      }
 
       const products = await Product.find(filter)
         .select(
-          "productId name stock description price mrp variants brand category subcategory sizeChartType productDetails",
+          "productId name stock description price mrp variants brand category subcategory details",
         )
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
         .lean();
 
+      products.forEach((p) => {
+        if (p.variants?.length) {
+          p.thumbnail = p.variants[0].images?.[0] || null;
+        }
+      });
+
       return Response.json({ products });
     }
 
     if (routePath === "public/products/latest") {
       const products = await Product.find({ isActive: true })
+        .select("productId name price mrp variants brand category")
         .sort({ createdAt: -1 })
         .limit(6)
         .lean();
+
+      products.forEach((p) => {
+        if (p.variants?.length) {
+          p.thumbnail = p.variants[0].images?.[0] || null;
+        }
+      });
 
       return Response.json({ products });
     }
 
     // GET /api/ims/public/products/:productId
     if (routePath.startsWith("public/products/")) {
-      const productId = Number(routePath.split("/")[2]);
+      const segments = routePath.split("/");
+      const productId = Number(segments[segments.length - 1]);
 
       if (!Number.isInteger(productId)) {
         return Response.json({ error: "Invalid product ID" }, { status: 400 });

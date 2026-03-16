@@ -19,13 +19,42 @@ const ProductSchema = new mongoose.Schema(
           type: String,
           required: true,
         },
+
         images: {
           type: [String],
           default: [],
         },
+
+        // clothing support
         sizes: {
           type: [String],
           default: [],
+        },
+
+        // drinkware / hardware support
+        capacity: {
+          type: Number, // ml
+        },
+
+        weight: {
+          type: Number, // grams
+        },
+
+        price: {
+          type: Number,
+        },
+
+        mrp: {
+          type: Number,
+        },
+
+        sku: {
+          type: String,
+        },
+
+        stock: {
+          type: Number,
+          default: 0,
         },
       },
     ],
@@ -42,23 +71,32 @@ const ProductSchema = new mongoose.Schema(
 
     // 🔥 NEW FIELDS (Clean Extensions)
 
-    sizeChartType: {
-      type: String,
-      enum: ["kidsHoodie", "fullSleeveTop", "ribbedTop", "generalTopBottom"],
-    },
+    details: {
+      features: {
+        type: [String],
+        default: [],
+      },
 
-    productDetails: {
-      material: { type: String },
-      closureType: { type: String },
-      careInstructions: { type: String },
-      style: { type: String },
-      pattern: { type: String },
-      countryOfOrigin: { type: String },
-      manufacturer: { type: String },
-      manufacturerContact: { type: String },
-      packer: { type: String },
-      packerContact: { type: String },
-      unitCount: { type: String },
+      material: {
+        type: String,
+      },
+
+      finish: {
+        type: String,
+      },
+
+      design: {
+        type: String,
+      },
+
+      sustainability: {
+        type: String,
+      },
+
+      care: {
+        type: [String],
+        default: [],
+      },
     },
   },
   { timestamps: true },
