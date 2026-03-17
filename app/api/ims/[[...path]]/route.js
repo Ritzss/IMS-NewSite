@@ -178,8 +178,8 @@ export async function POST(request, { params }) {
 
       const name = formData.get("name");
       const description = formData.get("description");
-      const category = formData.get("category");
-      const subcategory = formData.get("subcategory");
+      const category = formData.get("category")?.toLowerCase().trim();
+      const subcategory = formData.get("subcategory")?.toLowerCase().trim();
       const brand = formData.get("brand");
       const price = Number(formData.get("price"));
       const mrp = Number(formData.get("mrp"));
@@ -266,7 +266,7 @@ export async function POST(request, { params }) {
 
       // 🔎 Check if product already exists (same name/category/subcategory)
       const existingProduct = await Product.findOne({
-        name,
+        name: new RegExp(`^${escapeRegex(name.trim())}$`, "i"),
         category,
         subcategory,
       });
@@ -361,8 +361,8 @@ export async function POST(request, { params }) {
       const productId = Number(formData.get("productId"));
       const name = formData.get("name");
       const description = formData.get("description");
-      const category = formData.get("category");
-      const subcategory = formData.get("subcategory");
+      const category = formData.get("category")?.toLowerCase().trim();
+      const subcategory = formData.get("subcategory")?.toLowerCase().trim();
       const brand = formData.get("brand");
       const price = Number(formData.get("price"));
       const mrp = Number(formData.get("mrp"));
@@ -1312,7 +1312,7 @@ export async function GET(request, { params }) {
         startDate: searchParams.get("startDate"),
         endDate: searchParams.get("endDate"),
       };
-      const limit = Math.min(parseInt(searchParams.get("limit")) || 8, 50);
+      const limit = Math.min(parseInt(searchParams.get("limit")) || 8, 100);
 
       // const limit = parseInt(searchParams.get("limit") || "50");
 
@@ -1435,7 +1435,7 @@ export async function GET(request, { params }) {
 
     if (routePath === "orders/list") {
       checkRole(user, ["admin"]);
-      const limit = Math.min(parseInt(searchParams.get("limit")) || 8, 50);
+      const limit = Math.min(parseInt(searchParams.get("limit")) || 8, 100);
       const page = Math.max(parseInt(searchParams.get("page")) || 1, 1);
       // const limit = parseInt(searchParams.get("limit") || "50");
       // const page = parseInt(searchParams.get("page") || "1");

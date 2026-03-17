@@ -1147,12 +1147,12 @@ export default function VastraDrobeIMS() {
                           <div>
                             <Label>Category</Label>
                             <Input
-                              placeholder="e.g., Boys Clothing, Women Accessories"
+                              placeholder="e.g., Bottles, Drinkware, Kitchenware"
                               value={productForm.category}
                               onChange={(e) =>
                                 setProductForm({
                                   ...productForm,
-                                  category: e.target.value,
+                                  category: e.target.value.toLowerCase().trim(),
                                 })
                               }
                               required
@@ -1164,12 +1164,12 @@ export default function VastraDrobeIMS() {
                           <div>
                             <Label>Sub Category</Label>
                             <Input
-                              placeholder="e.g., Boys Clothing, Women Accessories"
+                              placeholder="e.g., Brass Bottles, Tumblers, Jugs"
                               value={productForm?.subcategory ?? ""}
                               onChange={(e) =>
                                 setProductForm({
                                   ...productForm,
-                                  subcategory: e.target.value,
+                                  subcategory: e.target.value.toLowerCase().trim(),
                                 })
                               }
                               required
