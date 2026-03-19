@@ -1,7 +1,7 @@
 import './globals.css'
 
 export const metadata = {
-  title: 'Vastra IMS',
+  title: 'Brass IMS',
   description: 'A simple Inventory Management System',
 }
 

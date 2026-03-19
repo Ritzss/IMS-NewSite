@@ -899,7 +899,7 @@ export default function VastraDrobeIMS() {
       <header className="border-b bg-card">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-primary">VastraDrobe IMS</h1>
+            <h1 className="text-2xl font-bold text-primary">Brass IMS</h1>
             <p className="text-sm text-muted-foreground">
               Inventory Management System
             </p>
