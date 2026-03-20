@@ -7,7 +7,7 @@ import mongoose from "mongoose";
 // Product Schema (Existing - DO NOT MODIFY STRUCTURE)
 const ProductSchema = new mongoose.Schema(
   {
-    productId: { type: Number, unique: true, index: true },
+    productId: { type: String, unique: true, index: true },
     name: { type: String, required: true },
     price: { type: Number, required: true },
     mrp: { type: Number },

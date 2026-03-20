@@ -321,7 +321,7 @@ export async function POST(request, { params }) {
         { new: true, upsert: true },
       );
 
-      const nextProductId = counter.value;
+      const nextProductId = `#PDBNS-`+counter.value;
 
       const product = await Product.create({
         productId: nextProductId,
