@@ -25,12 +25,6 @@ const ProductSchema = new mongoose.Schema(
           default: [],
         },
 
-        // clothing support
-        sizes: {
-          type: [String],
-          default: [],
-        },
-
         // drinkware / hardware support
         capacity: {
           type: Number, // ml
