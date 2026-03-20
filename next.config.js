@@ -9,8 +9,6 @@ const nextConfig = {
       },
     ],
   },
-  // Remove if not using Server Components
-  serverComponentsExternalPackages: ["mongodb"],
 
   async headers() {
     return [
